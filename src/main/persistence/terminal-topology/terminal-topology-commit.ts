@@ -50,6 +50,7 @@ type TerminalTopologyCommitKind =
   | 'close_leaf'
   | 'close_tab'
   | 'move_leaf'
+  | 'move_leaf_into_tab'
   | 'admit_pane'
   | 'withdraw_pane'
   | 'apply_layout'
