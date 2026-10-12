@@ -10,6 +10,7 @@ import { useAppStore } from '../../store'
 import { formatShortcutLabel, useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { translate } from '@/i18n/i18n'
 import { TerminalTabSplitMenuSection } from './TerminalTabSplitMenuSection'
+import { TerminalTabMoveIntoTabMenuSection } from './TerminalTabMoveIntoTabMenuSection'
 import { TabSessionSurfaceSwitchMenuItems } from './TabSessionSurfaceSwitchMenuItems'
 import type { NativeChatTabSession } from './tab-session-history-switch'
 import { CopyTabIdMenuItem } from './CopyTabIdMenuItem'
@@ -164,6 +165,9 @@ export function SortableTabContextMenu({
         splitDownShortcut={splitDownShortcut}
         showTerminalSplit={canSplitTerminal}
       />
+      {structuredSessionId === undefined && !isChatView ? (
+        <TerminalTabMoveIntoTabMenuSection tabId={tab.id} worktreeId={tab.worktreeId} />
+      ) : null}
       {showTerminalViewSwitch ? (
         <>
           <ContextMenuSeparator />
