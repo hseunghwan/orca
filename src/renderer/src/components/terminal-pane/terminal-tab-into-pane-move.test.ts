@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestStore } from '@/store/slices/store-test-helpers'
 import { createStoreCascadesMockApi } from '@/store/slices/store-cascades-test-harness'
+import { toRemoteRuntimePtyId } from '../../../../shared/remote-runtime-pty-id'
+import { applyTerminalTabJoin } from './terminal-tab-into-pane-apply'
 import { moveTerminalTabIntoPane } from './terminal-tab-into-pane-move'
 import { createJoinHarness } from './terminal-tab-into-pane-move-harness'
 import {
@@ -84,29 +86,36 @@ describe('moveTerminalTabIntoPane apply order (spec 5.1)', () => {
     expect(h.store.getState().lastKnownRelayPtyIdByTabId[SOURCE]).toBeUndefined()
   })
 
-  it('a remote-runtime PTY id is owned by the target and survives the source close', async () => {
-    const remote = 'remote:env-1@@pty-a'
+  it('a remote-runtime PTY id is owned by the target and survives the source close', () => {
+    // Eligibility refuses host-authoritative layouts today; the apply step must still bind any id.
+    const remote = toRemoteRuntimePtyId('pty-a', 'env-1')
     const h = createJoinHarness(createTestStore())
     h.store.setState((s) => ({
       ptyIdsByTabId: { ...s.ptyIdsByTabId, [SOURCE]: [remote] },
-      tabsByWorktree: {
-        [WT]: s.tabsByWorktree[WT]!.map((tab) =>
-          tab.id === SOURCE ? { ...tab, ptyId: remote } : tab
-        )
-      },
       terminalLayoutsByTabId: {
         ...s.terminalLayoutsByTabId,
         [SOURCE]: { ...sourceLayout(), ptyIdsByLeafId: { [A]: remote } }
       }
     }))
-    h.answerWith(() => Promise.resolve({ status: 'moved', ptyId: remote, sourceTabClosed: true }))
 
-    await expect(moveTerminalTabIntoPane(join, h.deps)).resolves.toBe('moved')
-    await Promise.resolve()
+    applyTerminalTabJoin(
+      h.deps,
+      {
+        worktreeId: WT,
+        sourceTabId: SOURCE,
+        targetTabId: TARGET,
+        targetLeafId: C,
+        leafId: A,
+        ptyId: remote,
+        placement: { kind: 'beside', side: 'right' }
+      },
+      remote
+    )
 
     expect(mockApi.pty.kill).not.toHaveBeenCalled()
     const state = h.store.getState()
     expect(state.ptyIdsByTabId[TARGET]).toContain(remote)
+    expect(state.ptyIdsByTabId[SOURCE]).toBeUndefined()
     expect(state.terminalLayoutsByTabId[TARGET]?.ptyIdsByLeafId?.[A]).toBe(remote)
   })
 
