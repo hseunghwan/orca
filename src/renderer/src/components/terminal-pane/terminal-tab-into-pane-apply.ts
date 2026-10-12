@@ -47,7 +47,7 @@ function graftIntoTarget(
 }
 
 /**
- * Applies a join main has committed: T's layout and PTY ownership first, so S's close sees the PTY
+ * Applies a join main has committed: T's layout and PTY binding first, so S's close sees the PTY
  * as shared; then the mounted pane adopts it; S closes last. False when the target is gone here.
  */
 export function applyTerminalTabJoin(
@@ -61,6 +61,9 @@ export function applyTerminalTabJoin(
     return false
   }
   deps.getStore().setTabLayout(targetTabId, grafted)
+  // T lists the PTY as a pane binding now, so S's close sees it as shared. The adopting pane makes
+  // this same call; T's primary PTY stays and the relay hint becomes the last pane to bind.
+  deps.getStore().updateTabPtyId(targetTabId, ptyId)
   deps.getStore().syncPaneMoveIntoTabPtyOwnership({
     movedLeafId: leafId,
     movedPtyId: ptyId,

@@ -1,6 +1,5 @@
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import type { TerminalSlice, TerminalStoreGet, TerminalStoreSet } from './terminal-state'
-import { uniquePtyIds, withTerminalTabPtyId } from './terminal-pty-identities'
 
 function withoutValue(record: Record<string, string>, key: string, value: string) {
   if (record[key] !== value) {
@@ -18,22 +17,14 @@ export function createTerminalMoveIntoTabActions(
   return {
     syncPaneMoveIntoTabPtyOwnership: ({ movedLeafId, movedPtyId, sourceTabId, targetTabId }) => {
       set((s) => {
-        const tabs = Object.values(s.tabsByWorktree).flat()
         const sourceScrollback = s.localOnlyScrollbackByTabId[sourceTabId]?.[movedLeafId]
         const sourceUnread = s.unreadTerminalTabs[sourceTabId]
         const { [sourceTabId]: sourceBuffers, ...otherScrollback } = s.localOnlyScrollbackByTabId
         const { [movedLeafId]: _moved, ...sourceBuffersLeft } = sourceBuffers ?? {}
         return {
-          // The target owns the PTY before the source closes, so the close plan sees it as shared.
-          ptyIdsByTabId: {
-            ...s.ptyIdsByTabId,
-            [sourceTabId]: (s.ptyIdsByTabId[sourceTabId] ?? []).filter((id) => id !== movedPtyId),
-            [targetTabId]: uniquePtyIds([...(s.ptyIdsByTabId[targetTabId] ?? []), movedPtyId])
-          },
-          // R22: only the source row drops the moved PTY; the target primary is unchanged.
-          tabsByWorktree: tabs.some((tab) => tab.id === sourceTabId && tab.ptyId === movedPtyId)
-            ? withTerminalTabPtyId(s.tabsByWorktree, sourceTabId, null)
-            : s.tabsByWorktree,
+          // Tab PTY ownership (ptyIdsByTabId, tab rows) is not written here: the renderer
+          // layout-writer ratchet counts those writes. The apply step binds the PTY to the target
+          // with `updateTabPtyId`, and closeTab(S) drops the source's entries.
           lastKnownRelayPtyIdByTabId: withoutValue(
             s.lastKnownRelayPtyIdByTabId,
             sourceTabId,

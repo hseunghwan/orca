@@ -76,23 +76,21 @@ beforeEach(() => {
 })
 
 describe('syncPaneMoveIntoTabPtyOwnership', () => {
-  it('R21: the target owns the moved PTY and the source no longer lists it', () => {
+  it('R23: the source relay hint is dropped and the target one is left to updateTabPtyId', () => {
     const store = seedJoin()
     sync(store)
 
-    expect(store.getState().ptyIdsByTabId[TARGET]).toEqual([TARGET_PTY, MOVED])
-    expect(store.getState().ptyIdsByTabId[SOURCE]).toEqual([])
+    expect(store.getState().lastKnownRelayPtyIdByTabId[TARGET]).toBe(TARGET_PTY)
+    expect(store.getState().lastKnownRelayPtyIdByTabId[SOURCE]).toBeUndefined()
   })
 
-  it('R22/R23: the target primary and relay hint stay, even though the moved leaf is active', () => {
+  it('writes no tab PTY ownership: ptyIdsByTabId and tab rows are the apply step and closeTab', () => {
     const store = seedJoin()
+    const before = store.getState()
     sync(store)
 
-    const rows = store.getState().tabsByWorktree[WT]
-    expect(rows.find((tab) => tab.id === TARGET)?.ptyId).toBe(TARGET_PTY)
-    expect(store.getState().lastKnownRelayPtyIdByTabId[TARGET]).toBe(TARGET_PTY)
-    expect(rows.find((tab) => tab.id === SOURCE)?.ptyId).toBeNull()
-    expect(store.getState().lastKnownRelayPtyIdByTabId[SOURCE]).toBeUndefined()
+    expect(store.getState().ptyIdsByTabId).toBe(before.ptyIdsByTabId)
+    expect(store.getState().tabsByWorktree).toBe(before.tabsByWorktree)
   })
 
   it('R24: clears the moved PTY from the source deferred and pending-reconnect slots only', () => {
@@ -176,14 +174,13 @@ describe('syncPaneMoveIntoTabPtyOwnership', () => {
     expect(state.migrationUnsupportedByPtyId[MOVED]).toMatchObject({ paneKey: TO, tabId: TARGET })
   })
 
-  it('A1: closing the emptied source after the sync kills no PTY and keeps the target owner', async () => {
+  it('A1: closing the source after the sync kills no PTY while the target layout lists it', async () => {
     const store = seedJoin()
     sync(store)
     store.getState().closeTab(SOURCE, { reason: 'cleanup' })
     await Promise.resolve()
 
     expect(mockApi.pty.kill).not.toHaveBeenCalled()
-    expect(store.getState().ptyIdsByTabId[TARGET]).toContain(MOVED)
     expect(store.getState().terminalLayoutsByTabId[TARGET]?.ptyIdsByLeafId?.[A]).toBe(MOVED)
   })
 

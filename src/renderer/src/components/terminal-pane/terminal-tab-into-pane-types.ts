@@ -18,6 +18,7 @@ export type TerminalTabIntoPaneStore = TerminalTabIntoPaneState &
     | 'setActiveTabType'
     | 'setTabLayout'
     | 'syncPaneMoveIntoTabPtyOwnership'
+    | 'updateTabPtyId'
   >
 
 /** Everything the move touches outside the store, so the ordering can be tested without a DOM. */
