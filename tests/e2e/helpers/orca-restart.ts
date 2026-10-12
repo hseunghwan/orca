@@ -31,7 +31,7 @@ type LaunchedOrca = {
   page: Page
 }
 
-type RestartSession = {
+export type RestartSession = {
   userDataDir: string
   seedCodexResumeRollout: (sessionId: string, cwd: string) => string
   launch: (options?: LaunchOptions) => Promise<LaunchedOrca>
@@ -95,6 +95,9 @@ function createRestartLaunchIsolation(
     inheritedEnv: cleanEnv,
     launchEnv: {
       NODE_ENV: 'development',
+      ...(process.env.ORCA_E2E_SSH_DOCKER === '1' && !cleanEnv.ORCA_RELAY_PATH
+        ? { ORCA_RELAY_PATH: path.join(process.cwd(), 'out', 'relay') }
+        : {}),
       ...extraEnv,
       ...(headful ? { ORCA_E2E_HEADFUL: '1' } : { ORCA_E2E_HEADLESS: '1' })
     },
