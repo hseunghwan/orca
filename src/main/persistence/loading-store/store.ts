@@ -6,6 +6,8 @@ import {
 import { agentHookServer } from '../../agent-hooks/server'
 import { ActiveViewPreference } from '../../active-view-preference'
 import { registerPersistedPaneKeyAlias } from '../restoring-sessions/pane-alias-normalization'
+import { findLiveLeafOwnerTabId } from '../terminal-topology/terminal-leaf-live-owner'
+import { isTerminalOwnerPartition } from '../terminal-topology/terminal-topology-membership'
 import { normalizePersistedPaneIdentityState } from '../restoring-sessions/workspace-pane-normalization'
 import { nameEmptyPersistedTerminalLayoutRoots } from '../restoring-sessions/empty-terminal-layout-root-repair'
 import { StoreRuntimeState, type StoreRuntimeOptions } from './store-runtime-state'
@@ -150,6 +152,16 @@ export class Store {
       for (const entry of normalized.legacyPaneKeyAliasEntries) {
         registerPersistedPaneKeyAlias(entry)
       }
+      // Why: a hook key whose alias was evicted still names a leaf that main's layouts can place.
+      agentHookServer.setLiveLeafOwnerResolver((tabId, leafId) =>
+        findLiveLeafOwnerTabId(
+          this.getWorkspaceSessionHostIds()
+            .filter(isTerminalOwnerPartition)
+            .map((hostId) => this.getWorkspaceSession(hostId)),
+          tabId,
+          leafId
+        )
+      )
       setMigrationUnsupportedPtyPersistenceListener((entries) => {
         this.state.migrationUnsupportedPtyEntries = entries
         scheduleSave(this.domains.scheduling, ['migrationUnsupportedPtyEntries'])

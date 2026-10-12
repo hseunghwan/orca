@@ -1,11 +1,15 @@
 import { agentHookServer } from '../agent-hooks/server'
+import { rekeyMigrationUnsupportedPtyPaneKey } from '../agent-hooks/migration-unsupported-pty-state'
 import { forgetFailedAgentLaunches } from '../agent-launch/agent-launch-pane-attachment'
+import { rememberPaneKeyForPty } from '../ipc/pty/pane/key-state'
 import type { Store } from '../persistence/loading-store/store'
 import { makePaneKey, parsePaneKey } from '../../shared/stable-pane-id'
 import type { TerminalLeafMoveRequest } from '../../shared/terminal-leaf-move'
 import type { OrcaRuntimeService } from './orca-runtime'
 
-type PaneOwnerRuntime = Pick<OrcaRuntimeService, 'getExistingOrchestrationDb'> | undefined
+type PaneOwnerRuntime =
+  | Pick<OrcaRuntimeService, 'getExistingOrchestrationDb' | 'restampMovedPtySurface'>
+  | undefined
 type PaneAddress = { tabId: string; leafId: string }
 
 /** Rekey after pane move; log failures and retain the failed owner's old key. False if either transfer fails. */
@@ -52,6 +56,17 @@ export function rekeyMovedPaneOwners(
     { tabId: request.targetTabId, leafId: request.leafId },
     request.ptyId
   )
+  if (request.ptyId) {
+    const toPaneKey = makePaneKey(request.targetTabId, request.leafId)
+    try {
+      // Why: the PTY keeps its spawn-time key in its env; every main-side pane-key lookup must see the new owner.
+      rememberPaneKeyForPty(request.ptyId, toPaneKey)
+      rekeyMigrationUnsupportedPtyPaneKey(request.ptyId, toPaneKey)
+      runtime?.restampMovedPtySurface(request.ptyId, request.targetTabId, toPaneKey)
+    } catch (error) {
+      console.warn('[pty] moved pane kept its old PTY identity records:', error)
+    }
+  }
 }
 
 /** Repair duplicate panes once at startup, after this runtime can transfer ownership. */
