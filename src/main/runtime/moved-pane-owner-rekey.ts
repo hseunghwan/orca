@@ -57,15 +57,32 @@ export function rekeyMovedPaneOwners(
     request.ptyId
   )
   if (request.ptyId) {
-    const toPaneKey = makePaneKey(request.targetTabId, request.leafId)
-    try {
-      // Why: the PTY keeps its spawn-time key in its env; every main-side pane-key lookup must see the new owner.
-      rememberPaneKeyForPty(request.ptyId, toPaneKey)
-      rekeyMigrationUnsupportedPtyPaneKey(request.ptyId, toPaneKey)
-      runtime?.restampMovedPtySurface(request.ptyId, request.targetTabId, toPaneKey)
-    } catch (error) {
-      console.warn('[pty] moved pane kept its old PTY identity records:', error)
-    }
+    rekeyMovedPtyIdentity(runtime, request.ptyId, request.targetTabId, request.leafId)
+  }
+}
+
+/** The PTY keeps its spawn-time key in its env; every main-side pane-key lookup must see the new owner. */
+function rekeyMovedPtyIdentity(
+  runtime: PaneOwnerRuntime,
+  ptyId: string,
+  targetTabId: string,
+  leafId: string
+): void {
+  const toPaneKey = makePaneKey(targetTabId, leafId)
+  try {
+    rememberPaneKeyForPty(ptyId, toPaneKey)
+  } catch (error) {
+    console.warn('[pty] moved pane kept its old PTY pane-key lookup:', error)
+  }
+  try {
+    rekeyMigrationUnsupportedPtyPaneKey(ptyId, toPaneKey)
+  } catch (error) {
+    console.warn('[pty] moved pane kept its old migration-unsupported entry:', error)
+  }
+  try {
+    runtime?.restampMovedPtySurface(ptyId, targetTabId, toPaneKey)
+  } catch (error) {
+    console.warn('[pty] moved pane kept its old runtime PTY record:', error)
   }
 }
 
