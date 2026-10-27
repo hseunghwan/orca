@@ -305,7 +305,6 @@ export function EditorEditFileSurface({
     <PluginCustomEditorFrame
       key={`${activeFile.id}\u0000${customEditor.key}`}
       editor={customEditor}
-      fileId={activeFile.id}
       content={currentContent}
       readOnly={activeFile.readOnly === true}
       onContentChange={handleContentChange}
