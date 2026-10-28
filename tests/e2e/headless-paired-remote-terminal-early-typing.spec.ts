@@ -47,12 +47,15 @@ test('keys typed into a new remote terminal before its first prompt all reach th
   // Three host terminals, each held at its rc file until the keys are in, plus host and client boot.
   test.setTimeout(240_000)
   const host = await launchHeadlessPairedRuntimeHost({ extraEnv: { SHELL: '/bin/bash' } })
-  const home = host.env.HOME ?? ''
+  const home = host.env.HOME
+  if (!home) {
+    throw new Error('The headless host launched without an isolated HOME')
+  }
   const release = path.join(home, '.orca-e2e-release-rc')
   mkdirSync(home, { recursive: true })
-  // Each shell waits in its rc file for the release file (bounded at ~30s), so typing lands first.
+  // Each shell waits in its rc file for the release file (bounded at ~120s, past the 60s bind wait).
   const rc = [
-    'for _ in $(seq 600); do [ -f "$HOME/.orca-e2e-release-rc" ] && break; sleep 0.05; done',
+    'for _ in $(seq 2400); do [ -f "$HOME/.orca-e2e-release-rc" ] && break; sleep 0.05; done',
     `PS1='${PROMPT}'`
   ].join('\n')
   writeFileSync(path.join(home, '.bash_profile'), `${rc}\n`)
@@ -97,17 +100,25 @@ test('keys typed into a new remote terminal before its first prompt all reach th
       expect(await paneText(page, tabId)).not.toContain(PROMPT)
 
       await focusActiveTerminalInput(page)
-      await page.keyboard.insertText(`echo EARLY_TYPING_${round}_$((40+2))`)
+      const typed = `echo EARLY_TYPING_${round}_$((40+2))`
+      await page.keyboard.insertText(typed)
       await page.keyboard.press('Enter')
       expect(existsSync(release)).toBe(false)
       writeFileSync(release, '')
 
+      const ran = new RegExp(`^EARLY_TYPING_${round}_42$`, 'gm')
       await expect
-        .poll(() => paneText(page, tabId), {
+        .poll(async () => (await paneText(page, tabId)).match(ran)?.length ?? 0, {
           timeout: 30_000,
           message: `round ${round}: the shell never ran the whole early-typed command`
         })
-        .toMatch(new RegExp(`^EARLY_TYPING_${round}_42$`, 'm'))
+        .toBeGreaterThan(0)
+      const text = await paneText(page, tabId)
+      // The rc file's own prompt proves it ran; the tty echo before it proves the keys beat it.
+      expect(text).toContain(PROMPT)
+      expect(text.indexOf(typed)).toBeGreaterThanOrEqual(0)
+      expect(text.indexOf(typed)).toBeLessThan(text.indexOf(PROMPT))
+      expect(text.match(ran)).toHaveLength(1)
     }
   } finally {
     await client?.dispose()
