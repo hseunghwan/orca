@@ -33,7 +33,8 @@ vi.mock('expo-router', () => ({}))
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }))
 vi.mock('../storage/preferences', () => ({ savePinnedIds: async () => {} }))
 vi.mock('../transport/host-removal-lifecycle', () => ({ removeHostAndCloseClient: async () => {} }))
-vi.mock('../host-route-exit', () => ({ leaveHostRoute: () => {} }))
+const leaveHostRoute = vi.hoisted(() => vi.fn())
+vi.mock('../host-route-exit', () => ({ leaveHostRoute }))
 
 const item: Worktree = {
   worktreeId: 'folder-one',
@@ -123,7 +124,10 @@ describe('a workspace child opens its parent pane', () => {
   )
 })
 
-async function tapRowWhileRecording(pathname: string, row: Worktree) {
+async function tapWhileRecording(
+  pathname: string,
+  tap: (actions: ReturnType<typeof useHostWorktreeActions>) => void
+) {
   const replace = vi.fn()
   const sendRequest = vi.fn(async (): Promise<RpcResponse> => ({
     id: 'activate',
@@ -132,10 +136,10 @@ async function tapRowWhileRecording(pathname: string, row: Worktree) {
   }))
   // The recording session publishes a guard that holds the leave.
   const guard = vi.fn(() => true)
-  const held: { open?: (item: Worktree) => void } = {}
+  const held: { actions?: ReturnType<typeof useHostWorktreeActions> } = {}
   function Probe() {
     useSessionLeaveGuard(guard)
-    held.open = useHostWorktreeActions({
+    held.actions = useHostWorktreeActions({
       client: stubRpcClient({ sendRequest }),
       hostCapabilities: [MOBILE_DESKTOP_RELAY_RUNTIME_CAPABILITY],
       connState: 'connected',
@@ -149,30 +153,42 @@ async function tapRowWhileRecording(pathname: string, row: Worktree) {
         typeof useHostWorktreeActions
       >[0]['router'],
       state: useHostScreenState('host')
-    }).openWorktreeSession
+    })
     return null
   }
   await act(async () => {
     create(createElement(Probe))
   })
   await act(async () => {
-    held.open?.(row)
+    if (held.actions) {
+      tap(held.actions)
+    }
   })
   return { replace, sendRequest, guard }
 }
 
 describe('a sidebar tap while the open session is recording', () => {
   it('stays without touching the other workspace', async () => {
-    const tap = await tapRowWhileRecording('/h/host/session/other', item)
+    const tap = await tapWhileRecording('/h/host/session/other', (actions) =>
+      actions.openWorktreeSession(item)
+    )
     expect(tap.guard).toHaveBeenCalledTimes(1)
     expect(tap.replace).not.toHaveBeenCalled()
     expect(tap.sendRequest).not.toHaveBeenCalled()
   })
 
   it('keeps recording when the tap is on the open session itself', async () => {
-    const tap = await tapRowWhileRecording('/h/host/session/folder-one', item)
+    const tap = await tapWhileRecording('/h/host/session/folder-one', (actions) =>
+      actions.openWorktreeSession(item)
+    )
     expect(tap.guard).not.toHaveBeenCalled()
     expect(tap.replace).not.toHaveBeenCalled()
+  })
+
+  it('stays on Back to hosts too', async () => {
+    const tap = await tapWhileRecording('/h/host/session/other', (actions) => actions.leaveHost())
+    expect(tap.guard).toHaveBeenCalledTimes(1)
+    expect(leaveHostRoute).not.toHaveBeenCalled()
   })
 })
 

@@ -76,8 +76,11 @@ export function useHostWorktreeActions(args: {
     [client, hostCapabilities]
   )
 
+  // A removed host leaves unconditionally; this is the user's own leave, which a recording session holds first.
   const leaveHost = useCallback(() => {
-    leaveHostRoute(router)
+    if (!holdSessionLeave()) {
+      leaveHostRoute(router)
+    }
   }, [router])
 
   const openNewWorktreeModal = useCallback(
@@ -205,7 +208,7 @@ export function useHostWorktreeActions(args: {
     }
     try {
       await removeHostAndCloseClient(hostId, forgetHostClient)
-      leaveHost()
+      leaveHostRoute(router)
     } catch (error) {
       if (isPageHostRemovalUnavailable(error)) {
         // Page removal is unsupported; do not offer a confirm or retry that cannot work.
@@ -217,7 +220,7 @@ export function useHostWorktreeActions(args: {
       // React Native Web Alert is a no-op; show a dismissible action error while keeping the list, header and confirm usable.
       setActionError('Could not remove host. Please try again.')
     }
-  }, [hostId, leaveHost, forgetHostClient, setActionError, setConfirmRemoveHost])
+  }, [hostId, router, forgetHostClient, setActionError, setConfirmRemoveHost])
 
   // beforeNavigate runs unless the open session holds the leave, so a held tap leaves the target untouched.
   const navigateFromHostList = useCallback(
