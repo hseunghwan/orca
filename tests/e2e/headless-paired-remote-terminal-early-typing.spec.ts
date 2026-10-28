@@ -40,8 +40,8 @@ function paneIsBound(page: Page, tabId: string): Promise<boolean> {
 }
 
 // Keys typed into a new remote terminal after it binds, while the host shell's rc file still runs,
-// must all reach that shell: its tty keeps type-ahead for readline, and nothing may drop a prefix.
-test('keys typed into a new remote terminal before its first prompt all reach the shell', async ({
+// must all reach that shell: nothing may drop a prefix or deliver them twice.
+test("keys typed before a new remote terminal's first prompt are all delivered, exactly once", async ({
   testRepoPath
 }) => {
   // Three host terminals, each held at its rc file until the keys are in, plus host and client boot.
