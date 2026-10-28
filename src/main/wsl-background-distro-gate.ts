@@ -49,9 +49,20 @@ export async function readConfirmedRunningWslDistros(
   }
 }
 
+const mayHaveStoppedListeners = new Set<(distro: string) => void>()
+
 /** A link into the distro died, or a read saw it stop: later running reads must start after it settles. */
 export function noteWslDistroMayHaveStopped(distro: string): void {
   mayHaveStoppedAt.set(distroKey(distro), performance.now())
+  for (const listener of mayHaveStoppedListeners) {
+    listener(distro)
+  }
+}
+
+/** Hears every may-have-stopped note, including relay and watcher exits no running list saw yet. */
+export function onWslDistroMayHaveStopped(listener: (distro: string) => void): () => void {
+  mayHaveStoppedListeners.add(listener)
+  return () => mayHaveStoppedListeners.delete(listener)
 }
 
 /** A user act just touched the distro, which starts it: an older 'stopped' read no longer answers. */
@@ -249,6 +260,7 @@ export function _resetWslBackgroundDistroGateForTests(): void {
   unsubscribeObservations?.()
   unsubscribeObservations = null
   mayHaveStoppedAt.clear()
+  mayHaveStoppedListeners.clear()
   wokenAt.clear()
   unsubscribeStops?.()
   unsubscribeStops = null

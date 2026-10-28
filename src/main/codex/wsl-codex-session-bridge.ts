@@ -4,6 +4,7 @@ import { parseWslUncPath } from '../../shared/wsl-paths'
 import { runWslProcess } from '../wsl/wsl-runner'
 import { assertWslUncPathRunning } from '../wsl/wsl-unc-access-gate'
 import { onRunningWslDistrosStopped } from '../wsl-running-distro-cache'
+import { onWslDistroMayHaveStopped } from '../wsl-background-distro-gate'
 import { isCodexAccountSessionBridgeStopping } from './codex-account-session-bridge'
 import { runCodexAppServerSession } from './codex-app-server-session'
 import {
@@ -69,7 +70,15 @@ const defaultWslBridgeDependencies: WslBridgeDependencies = {
   openStateDb: createCodexAccountStateDb,
   healPending: healPendingCodexAccountThreads,
   requireRunning: (distro) => assertWslUncPathRunning('', distro),
-  subscribeStops: onRunningWslDistrosStopped
+  // A running-list diff, or an explicit note (a relay or watcher exit) before any list saw it.
+  subscribeStops: (listener) => {
+    const unsubscribeList = onRunningWslDistrosStopped(listener)
+    const unsubscribeNotes = onWslDistroMayHaveStopped((distro) => listener([distro], []))
+    return () => {
+      unsubscribeList()
+      unsubscribeNotes()
+    }
+  }
 }
 
 const emptySummary: WslCodexSessionBridgeSummary = {
