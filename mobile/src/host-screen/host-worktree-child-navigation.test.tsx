@@ -10,6 +10,7 @@ import { MOBILE_DESKTOP_RELAY_RUNTIME_CAPABILITY } from '../../../src/shared/mob
 import type { Worktree } from '../worktree/workspace-list-types'
 import { useHostScreenState } from './use-host-screen-state'
 import { useHostWorktreeActions } from './use-host-worktree-actions'
+import { useSessionLeaveGuard } from '../session/session-leave-guard'
 import { stubRpcClient } from '../transport/rpc-client-test-stub'
 import type { RpcResponse } from '../transport/types'
 
@@ -120,6 +121,59 @@ describe('a workspace child opens its parent pane', () => {
       })
     }
   )
+})
+
+async function tapRowWhileRecording(pathname: string, row: Worktree) {
+  const replace = vi.fn()
+  const sendRequest = vi.fn(async (): Promise<RpcResponse> => ({
+    id: 'activate',
+    ok: true,
+    result: {}
+  }))
+  // The recording session publishes a guard that holds the leave.
+  const guard = vi.fn(() => true)
+  const held: { open?: (item: Worktree) => void } = {}
+  function Probe() {
+    useSessionLeaveGuard(guard)
+    held.open = useHostWorktreeActions({
+      client: stubRpcClient({ sendRequest }),
+      hostCapabilities: [MOBILE_DESKTOP_RELAY_RUNTIME_CAPABILITY],
+      connState: 'connected',
+      embedded: true,
+      fetchWorktrees: async () => {},
+      forgetHostClient: () => {},
+      hostId: 'host',
+      pathname,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: navigation reaches only push/replace; this double records both router methods.
+      router: { push: vi.fn(), replace } as unknown as Parameters<
+        typeof useHostWorktreeActions
+      >[0]['router'],
+      state: useHostScreenState('host')
+    }).openWorktreeSession
+    return null
+  }
+  await act(async () => {
+    create(createElement(Probe))
+  })
+  await act(async () => {
+    held.open?.(row)
+  })
+  return { replace, sendRequest, guard }
+}
+
+describe('a sidebar tap while the open session is recording', () => {
+  it('stays without touching the other workspace', async () => {
+    const tap = await tapRowWhileRecording('/h/host/session/other', item)
+    expect(tap.guard).toHaveBeenCalledTimes(1)
+    expect(tap.replace).not.toHaveBeenCalled()
+    expect(tap.sendRequest).not.toHaveBeenCalled()
+  })
+
+  it('keeps recording when the tap is on the open session itself', async () => {
+    const tap = await tapRowWhileRecording('/h/host/session/folder-one', item)
+    expect(tap.guard).not.toHaveBeenCalled()
+    expect(tap.replace).not.toHaveBeenCalled()
+  })
 })
 
 afterEach(unmountRenderers)
