@@ -36,7 +36,7 @@ type TerminalLiveInputCommitOptions<TTabType extends string> = {
   readonly activeHandleRef: RefObject<string | null>
   readonly activeSessionTabType: TTabType | null | undefined
   readonly activeSessionTabTypeRef: RefObject<TTabType | null>
-  readonly buildLivePasteText?: (handle: string, text: string) => string
+  readonly framesLivePaste?: (handle: string) => boolean
   readonly connected: boolean
   readonly liveInputRef: RefObject<TextInput | null>
   readonly liveInputTerminalHandles: ReadonlySet<string>
@@ -63,7 +63,7 @@ export function useTerminalLiveInputCommit<TTabType extends string>({
   activeHandleRef,
   activeSessionTabType,
   activeSessionTabTypeRef,
-  buildLivePasteText,
+  framesLivePaste,
   connected,
   liveInputRef,
   liveInputTerminalHandles,
@@ -103,7 +103,7 @@ export function useTerminalLiveInputCommit<TTabType extends string>({
   } = useTerminalLivePendingInputFlush({
     activeHandleRef,
     activeSessionTabTypeRef,
-    buildLivePasteText,
+    framesLivePaste,
     liveInputRef,
     liveInputTerminalHandlesRef,
     sendLiveTerminalInputRef,
