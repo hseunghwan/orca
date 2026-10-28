@@ -3,7 +3,7 @@ import { useEffect, useCallback, useRef } from 'react'
 import { AppState } from 'react-native'
 import { useFocusEffect } from 'expo-router'
 import { useMobileDictation } from '../hooks/use-mobile-dictation'
-import { triggerError } from '../platform/haptics'
+import { triggerEdgeBump, triggerError, triggerSelection } from '../platform/haptics'
 import { useClipboardWriter } from '../platform/clipboard'
 import {
   appendBufferedDictation,
@@ -143,14 +143,12 @@ export function useMobileSessionNativeChatDictation(
         if (insert) {
           if (insert(text) === false) {
             keepUndeliveredDictation(text)
-            return
           }
         } else {
           nativeChatController.setChatComposerText((current) =>
             appendBufferedDictation(current, text)
           )
         }
-        showToast('Dictation inserted')
         return
       }
       const routeContext = dictationRouteContextRef.current
@@ -166,6 +164,7 @@ export function useMobileSessionNativeChatDictation(
             insertHandle !== null &&
             (await flushPendingLiveInputBeforeExternalSend(insertHandle)) &&
             (await sendLiveTerminalInput(insertHandle, route.text))
+          // Live input lands in a terminal the keyboard may cover; the visible fields need no receipt.
           if (sent) {
             showToast('Dictation inserted')
           } else {
@@ -175,7 +174,6 @@ export function useMobileSessionNativeChatDictation(
         return
       }
       setInput((current) => appendBufferedDictation(current, route.text))
-      showToast('Dictation inserted')
     },
     onError: (err) => {
       dictationRouteContextRef.current = null
@@ -215,20 +213,33 @@ export function useMobileSessionNativeChatDictation(
     setShowDictationSetup
   ])
 
+  // Fire on the commit, not the press: starting waits on the host and may fail.
+  useEffect(() => {
+    if (dictation.isRecording) {
+      triggerEdgeBump()
+    }
+  }, [dictation.isRecording])
+
+  const stopDictation = useCallback(() => {
+    triggerSelection()
+    void dictation.stop()
+  }, [dictation])
+
   const cancelDictation = useCallback(() => {
     dictationRouteContextRef.current = null
+    triggerSelection()
     void dictation.cancel()
-  }, [dictation])
+  }, [dictation.cancel])
 
   const handleDictationToggle = useCallback(() => {
     if (dictation.isStarting || dictation.isProcessing) {
       // Ignore toggles until start or finish settles; a tap must not discard what was said.
     } else if (dictation.isRecording) {
-      void dictation.stop()
+      stopDictation()
     } else {
       startDictation()
     }
-  }, [dictation, startDictation])
+  }, [dictation, startDictation, stopDictation])
 
   const handleDictationPressIn = useCallback(() => {
     if (!dictation.isStarting && !dictation.isRecording && !dictation.isProcessing) {
@@ -238,12 +249,12 @@ export function useMobileSessionNativeChatDictation(
 
   const handleDictationPressOut = useCallback(() => {
     if (dictation.isRecording) {
-      void dictation.stop()
+      stopDictation()
     } else if (dictation.isStarting) {
       // Released before recording began: cancel so we don't leave a live mic.
       cancelDictation()
     }
-  }, [cancelDictation, dictation])
+  }, [cancelDictation, dictation, stopDictation])
 
   const dictationSettingsReadRef = useRef(0)
   const refreshDictationMode = useCallback(async () => {

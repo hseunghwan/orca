@@ -86,6 +86,7 @@ export function MobileSessionCommandDock({
               <MobileTerminalLiveInputStatus
                 dictation={dictation}
                 dictationMode={dictationMode}
+                meter={dictation.meter}
                 isAttaching={isAttaching}
                 liveInputText={liveInputCapture}
               />
@@ -165,6 +166,7 @@ export function MobileSessionCommandDock({
               dictation={dictation}
               dictationMode={dictationMode}
               dictationEnabled={dictationEnabled}
+              meterHalo={dictation.meter}
               buttonStyle={styles.dictationButton}
               activeButtonStyle={styles.dictationButtonActive}
               disabledButtonStyle={styles.sendButtonDisabled}

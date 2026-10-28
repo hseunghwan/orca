@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useDictationCapture } from '../platform/dictation-capture'
+import { useMobileDictationMeter } from './mobile-dictation-meter'
 import { MobileDictationPendingAudioBudget } from './mobile-dictation-pending-audio-budget'
 import {
   MobileDictationTranscriptSoFar,
@@ -325,6 +326,7 @@ export function useMobileDictation(options: UseMobileDictationOptions): UseMobil
     error,
     start,
     stop,
-    cancel
+    cancel,
+    meter: useMobileDictationMeter(capture, status === 'recording')
   }
 }

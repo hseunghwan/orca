@@ -60,5 +60,16 @@ export const mobileNativeChatComposerStyles = themedStyleSheet(() => ({
   },
   pressed: {
     opacity: 0.7
+  },
+  noShrink: {
+    flexShrink: 0
+  },
+  dictationMeter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    flexGrow: 6,
+    flexShrink: 1
   }
 }))

@@ -1,8 +1,12 @@
 import { createElement } from 'react'
 import { act, create } from 'react-test-renderer'
 import { expect, it, vi } from 'vitest'
-vi.mock('react-native', () => ({ Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator' }))
-vi.mock('lucide-react-native', () => ({ ImagePlus: 'ImagePlus', Mic: 'Mic' }))
+vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
+  ActivityIndicator: 'ActivityIndicator',
+  StyleSheet: { create: <T,>(styles: T) => styles }
+}))
+vi.mock('lucide-react-native', () => ({ ImagePlus: 'ImagePlus', Mic: 'Mic', X: 'X' }))
 import { MobileTerminalInputActions } from './MobileTerminalInputActions'
 
 it('removes the disabled microphone while keeping image attachment available', async () => {
@@ -65,7 +69,8 @@ it('keeps the microphone able to stop a recording while the connection is down',
   const mic = () =>
     renderer.root.find(
       (node) =>
-        String(node.type) === 'Pressable' && node.props.accessibilityLabel !== 'Attach a photo'
+        String(node.type) === 'Pressable' &&
+        String(node.props.accessibilityLabel).endsWith('voice dictation')
     )
   expect(mic().props.disabled).toBe(false)
   await act(async () =>
