@@ -1,11 +1,4 @@
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  View,
-  type StyleProp,
-  type ViewStyle
-} from 'react-native'
+import { ActivityIndicator, Pressable, View, type StyleProp, type ViewStyle } from 'react-native'
 import { ImagePlus, Mic, X } from 'lucide-react-native'
 import type { MobileDictationMeter } from '../hooks/mobile-dictation-meter'
 import { colors } from '../theme/mobile-theme'
@@ -135,7 +128,7 @@ export function MobileTerminalInputActions({
       {dictationEnabled ? (
         meterHalo ? (
           // Always wrapped, so the mic never remounts under a held press.
-          <View style={haloStyles.anchor}>
+          <View>
             {dictation.isRecording ? <MobileDictationHalo meter={meterHalo} size={34} /> : null}
             {mic}
           </View>
@@ -146,10 +139,3 @@ export function MobileTerminalInputActions({
     </>
   )
 }
-
-const haloStyles = StyleSheet.create({
-  anchor: {
-    alignItems: 'center',
-    justifyContent: 'center'
-  }
-})

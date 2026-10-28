@@ -59,7 +59,7 @@ export function MobileDictationTimer({ meter }: MeterProps) {
   return <Text style={styles.timer}>{`${minutes}:${seconds}`}</Text>
 }
 
-// The buffered command field has no status row, so its mic carries the level as a halo.
+// The buffered command field has no status row, so its mic carries the level as a halo; it overlays the mic's box at the origin.
 export function MobileDictationHalo({ meter, size }: MeterProps & { size: number }) {
   useMobileColorScheme()
   const { level, isClipping } = useMobileDictationMeterState(meter)
@@ -69,6 +69,8 @@ export function MobileDictationHalo({ meter, size }: MeterProps & { size: number
       pointerEvents="none"
       style={{
         position: 'absolute',
+        left: 0,
+        top: 0,
         width: size,
         height: size,
         borderRadius: size / 2,

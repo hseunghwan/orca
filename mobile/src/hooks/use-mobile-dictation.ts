@@ -268,19 +268,19 @@ export function useMobileDictation(options: UseMobileDictationOptions): UseMobil
       generationRef.current = generation
       activeIdRef.current = null
       closeDictationAudio()
-      if (client && dictationId) {
-        await cancelDesktopDictation(client, dictationId)
-      }
-      // The cancel round trip may overlap a new recording; stale completion must neither report over it nor reset it.
-      if (generationRef.current !== generation) {
-        return
-      }
+      const hostCancel = client && dictationId ? cancelDesktopDictation(client, dictationId) : null
       if (reason !== null && wasUnderway) {
-        reportError(new Error(reason))
+        await hostCancel
+        // The cancel round trip may overlap a new recording; a stale interruption must not report over it.
+        if (generationRef.current === generation) {
+          reportError(new Error(reason))
+        }
         return
       }
+      // Otherwise settle on the tap: a discard must not wait on the host while the timer keeps counting.
       applyStatus('idle')
       setError(null)
+      await hostCancel
     },
     [applyStatus, closeDictationAudio, reportError]
   )
