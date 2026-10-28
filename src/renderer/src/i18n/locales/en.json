@@ -11815,7 +11815,8 @@
             "install": "install plugin",
             "permissions": "plugin permissions",
             "logs": "plugin logs",
-            "development": "development plugins"
+            "development": "development plugins",
+            "aliases": "plugins mods extensions"
           }
         },
         "LinearAgentSkillGuide": {
