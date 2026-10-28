@@ -313,7 +313,8 @@ export function MobileNativeChatComposer({
                 )}
               </Pressable>
             ) : null}
-            {sessionOptions ? (
+            {/* While recording, the meter and discard take the pickers' room in the row. */}
+            {sessionOptions && !(micActive && !micStarting) ? (
               <MobileNativeChatSessionOptionPickers
                 {...sessionOptions}
                 sendInFlight={sending || isAttaching}

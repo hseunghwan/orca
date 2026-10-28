@@ -70,6 +70,6 @@ export const mobileNativeChatComposerStyles = themedStyleSheet(() => ({
     justifyContent: 'flex-end',
     gap: spacing.sm,
     flexGrow: 6,
-    flexShrink: 1
+    flexShrink: 0
   }
 }))
