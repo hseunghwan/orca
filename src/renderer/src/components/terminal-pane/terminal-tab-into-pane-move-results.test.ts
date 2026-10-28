@@ -7,6 +7,9 @@ import { createJoinHarness, mainSessionAfterJoin } from './terminal-tab-into-pan
 import { isTerminalTabMoveInFlight } from './terminal-leaf-move-guard'
 import { A, P_A, SOURCE, TARGET, WT } from './terminal-tab-into-pane-fixture'
 
+// The window-applied join under test exists only while the layout-owner switch is off.
+vi.mock('../../../../shared/layout-owner-switch', () => ({ ORCA_LAYOUT_OWNER_IS_MAIN: false }))
+
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), info: vi.fn() } }))
 vi.mock('@/components/terminal-pane/pty-dispatcher', () => ({
   restorePtyDataHandlersAfterFailedShutdown: vi.fn(),
@@ -74,6 +77,21 @@ describe('moveTerminalTabIntoPane results', () => {
       expect(h.store.getState().tabsByWorktree[WT]?.map((tab) => tab.id)).toEqual([TARGET])
       expect(h.store.getState().terminalLayoutsByTabId[TARGET]?.ptyIdsByLeafId?.[A]).toBe(P_A)
       expect(h.splits).toHaveLength(1)
+    })
+
+    it("reads main's session for the move's worktree", async () => {
+      const readFor: string[] = []
+      const h = createJoinHarness(createTestStore(), {
+        readMainSession: (worktreeId) => {
+          readFor.push(worktreeId)
+          return Promise.resolve(mainSessionAfterJoin())
+        }
+      })
+      h.answerWith(() => Promise.reject(new Error('channel closed')))
+
+      await expect(moveTerminalTabIntoPane(join, h.deps)).resolves.toBe('moved')
+
+      expect(readFor).toEqual([WT])
     })
 
     it('applies nothing and reports unknown when main still holds the leaf in the source', async () => {
