@@ -24,6 +24,7 @@ type RuntimeFileCommandName =
   | 'createFileExplorerDir'
   | 'createFileExplorerDirNoClobber'
   | 'commitFileExplorerUpload'
+  | 'replaceFileExplorerFileWithUpload'
   | 'renameFileExplorerPath'
   | 'copyFileExplorerPath'
   | 'deleteFileExplorerPath'
@@ -64,6 +65,7 @@ export function installRuntimeFileCommandSurface(
     createFileExplorerDir: commands.createFileExplorerDir.bind(commands),
     createFileExplorerDirNoClobber: commands.createFileExplorerDirNoClobber.bind(commands),
     commitFileExplorerUpload: commands.commitFileExplorerUpload.bind(commands),
+    replaceFileExplorerFileWithUpload: commands.replaceFileExplorerFileWithUpload.bind(commands),
     renameFileExplorerPath: commands.renameFileExplorerPath.bind(commands),
     copyFileExplorerPath: commands.copyFileExplorerPath.bind(commands),
     deleteFileExplorerPath: commands.deleteFileExplorerPath.bind(commands),
