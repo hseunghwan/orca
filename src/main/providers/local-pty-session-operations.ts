@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { diagEarly } from '../zz-diag-early-log'
 import { basename } from 'node:path'
 import type * as pty from 'node-pty'
 import { readPtsName } from '../pty/node-pty-pts-name'
@@ -25,6 +26,7 @@ import type { LocalPtyProviderOptions } from './local-pty-provider-types'
 import type { PtyProcessInfo } from './pty-provider-contract'
 
 export function writeLocalPty(id: string, data: string): boolean {
+  diagEarly(`local-write ${id}`, data)
   // Hold private DSR/OSC replies through cooked-mode echo; CPR/DA cannot overtake held replies (#13137, #7329, #15559).
   if (startupIngressByPty.get(id)?.answerLiveQueryReply(data)) {
     return true

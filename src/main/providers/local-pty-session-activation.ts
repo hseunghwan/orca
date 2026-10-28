@@ -1,4 +1,5 @@
 import type * as pty from 'node-pty'
+import { diagEarly } from '../zz-diag-early-log'
 import { isBracketedPasteSafeShell } from '../../shared/startup-command-submission'
 import {
   discardStagedStartupCommand,
@@ -125,6 +126,7 @@ export function activateLocalPtySession(args: {
   })
   const disposables: { dispose: () => void }[] = []
   const onDataDisposable = proc.onData((rawData) => {
+    diagEarly(`local-out ${id}`, rawData)
     readiness.acceptData(rawData)
   })
   if (onDataDisposable) {

@@ -1923,6 +1923,10 @@ export function createRemoteRuntimePtyTransport(
       return
     }
     const release = { stream, waitingForValidation: inputBatcher.hasPendingValidation() }
+    // DIAG ONLY (do not merge)
+    console.log(
+      `[diag-early] releaseHeld t=${Math.round(performance.now())} waitingForValidation=${release.waitingForValidation}`
+    )
     heldInputRelease = release
     if (release.waitingForValidation) {
       const targetLifecycleEpoch = lifecycleEpoch
@@ -3805,6 +3809,10 @@ export function createRemoteRuntimePtyTransport(
 
     // Why: the kind only gates the local hold; terminal.send gets no kind, so the host classifies desktop bytes itself.
     sendInput(data, inputKind): boolean {
+      // DIAG ONLY (do not merge)
+      console.log(
+        `[diag-early] sendInput t=${Math.round(performance.now())} handle=${handle} connected=${connected} hold=${shouldHoldInput()} pendingValidation=${inputBatcher.hasPendingValidation()} stream=${Boolean(handle && getCurrentMultiplexedStream(handle))} data=${JSON.stringify(data)}`
+      )
       if (releaseThenShouldHold(inputKind)) {
         if (!data) {
           return true

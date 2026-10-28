@@ -1,4 +1,5 @@
 import { isValidPtySize } from './daemon-pty-size'
+import { diagEarly } from '../zz-diag-early-log'
 import type { SessionOutputPlane, AttachedClient } from './session-output-plane'
 import { createSessionOutputPipeline } from './session-output-pipeline'
 import { SessionProducerPause } from './session-producer-pause'
@@ -88,6 +89,7 @@ export class Session {
       onEmission: (emission) => this.recoveryBarrier.accept(emission)
     })
     this.subprocess.onData((data) => {
+      diagEarly(`daemon-out ${this.sessionId} ready=${this.shellReady.state}`, data)
       if (!this._disposed) {
         this.shellReady.ingestSubprocessData(data)
       }
@@ -138,6 +140,7 @@ export class Session {
   }
 
   write(data: string): void {
+    diagEarly(`daemon-write ${this.sessionId} ready=${this.shellReady.state}`, data)
     // Human input must reach rc-file readers while automatic startup commands wait for readiness.
     if (this.isAlive && !this._disposed && !this.startupIngress.answerLiveQueryReply(data)) {
       this.subprocess.write(data)
