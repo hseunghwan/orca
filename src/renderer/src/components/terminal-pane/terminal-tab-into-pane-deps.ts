@@ -1,5 +1,10 @@
-import { SPLIT_TERMINAL_PANE_EVENT, TOGGLE_TERMINAL_PANE_EXPAND_EVENT } from '@/constants/terminal'
-import type { SplitTerminalPaneDetail } from '@/constants/terminal'
+import {
+  SET_TERMINAL_PANE_TITLE_EVENT,
+  SPLIT_TERMINAL_PANE_EVENT,
+  TOGGLE_TERMINAL_PANE_EXPAND_EVENT
+} from '@/constants/terminal'
+import type { SetTerminalPaneTitleDetail, SplitTerminalPaneDetail } from '@/constants/terminal'
+import { getResolvedExecutionHostIdForWorktree } from '@/lib/resolved-worktree-execution-host'
 import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
 import { useAppStore } from '@/store'
 import { moveTerminalTabIntoPane } from './terminal-tab-into-pane-move'
@@ -37,6 +42,10 @@ export function createTerminalTabIntoPaneDeps(): TerminalTabIntoPaneDeps {
       window.dispatchEvent(
         new CustomEvent(TOGGLE_TERMINAL_PANE_EXPAND_EVENT, { detail: { tabId } })
       ),
+    dispatchPaneTitle: (detail) =>
+      window.dispatchEvent(
+        new CustomEvent<SetTerminalPaneTitleDetail>(SET_TERMINAL_PANE_TITLE_EVENT, { detail })
+      ),
     scheduleGraphSync: scheduleRuntimeGraphSync,
     resyncParkedWatchers: (worktreeId, targetTabId) => {
       // Watchers exist only for parked tabs; a mounted target re-registers through its own panes.
@@ -49,7 +58,11 @@ export function createTerminalTabIntoPaneDeps(): TerminalTabIntoPaneDeps {
         })
       }
     },
-    readMainSession: () => window.api.session.get(),
+    // Why: an SSH workspace's layouts live in its host's session, not the local one.
+    readMainSession: (worktreeId) =>
+      window.api.session.get(
+        getResolvedExecutionHostIdForWorktree(useAppStore.getState(), worktreeId) ?? undefined
+      ),
     moveLeafIntoTab: (request) => window.api.pty.moveLeafIntoTab(request)
   }
 }

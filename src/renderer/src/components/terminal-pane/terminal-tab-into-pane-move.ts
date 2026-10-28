@@ -58,7 +58,7 @@ async function settleUnansweredMove(
   deps: TerminalTabIntoPaneDeps,
   request: TerminalLeafIntoTabRequest
 ): Promise<TerminalLeafIntoTabResult | null> {
-  const session = await deps.readMainSession().catch(() => null)
+  const session = await deps.readMainSession(request.worktreeId).catch(() => null)
   const layouts = session?.terminalLayoutsByTabId
   const inTarget = layoutContainsLeafId(
     layouts?.[request.targetTabId]?.root ?? null,
@@ -92,6 +92,7 @@ export async function moveTerminalTabIntoPane(
   // No await sits between the eligibility check and this hold.
   const release = holdTerminalMoveKeys([
     terminalLeafMoveKey(leafId),
+    terminalLeafMoveKey(targetLeafId),
     terminalTabMoveKey(sourceTabId),
     terminalTabMoveKey(targetTabId)
   ])
