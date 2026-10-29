@@ -1,4 +1,5 @@
 import { MobileQueuedMessageComposerContext } from './mobile-queued-message-composer-context'
+import type { MobileNativeChatDictationPreview } from './native-chat/composer/mobile-native-chat-draft-inputs'
 import { useCallback, useLayoutEffect, useMemo } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { MobileNativeChatView, type MobileNativeChatInputLockReason } from './MobileNativeChatView'
@@ -30,6 +31,7 @@ type Props = {
   micActive: boolean
   micStarting: boolean
   micProcessing: boolean
+  dictationPreview?: MobileNativeChatDictationPreview | null
   dictationMode: string | undefined
   onMicPressIn: () => void
   onMicPressOut: () => void
@@ -56,6 +58,7 @@ export function MobileNativeChatOverlay({
   micActive,
   micStarting,
   micProcessing,
+  dictationPreview,
   dictationMode,
   onMicPressIn,
   onMicPressOut,
@@ -139,6 +142,7 @@ export function MobileNativeChatOverlay({
       micActive,
       micStarting,
       micProcessing,
+      dictationPreview,
       dictationMode,
       onMicPressIn,
       onMicPressOut
@@ -155,6 +159,7 @@ export function MobileNativeChatOverlay({
       micActive,
       micStarting,
       micProcessing,
+      dictationPreview,
       dictationMode,
       onMicPressIn,
       onMicPressOut
@@ -245,6 +250,7 @@ export function MobileNativeChatOverlay({
                     onMicPress={onMicPress}
                     micActive={micActive}
                     micStarting={micStarting}
+                    dictationPreview={dictationPreview}
                     micProcessing={micProcessing}
                     dictationMode={dictationMode}
                     onMicPressIn={onMicPressIn}
