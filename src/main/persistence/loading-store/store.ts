@@ -6,7 +6,7 @@ import {
 import { agentHookServer } from '../../agent-hooks/server'
 import { ActiveViewPreference } from '../../active-view-preference'
 import { registerPersistedPaneKeyAlias } from '../restoring-sessions/pane-alias-normalization'
-import { findLiveLeafOwnerTabId } from '../terminal-topology/terminal-leaf-live-owner'
+import { installLiveLeafOwnerResolver } from './live-leaf-owner-resolver'
 import { isTerminalOwnerPartition } from '../terminal-topology/terminal-topology-membership'
 import { normalizePersistedPaneIdentityState } from '../restoring-sessions/workspace-pane-normalization'
 import { nameEmptyPersistedTerminalLayoutRoots } from '../restoring-sessions/empty-terminal-layout-root-repair'
@@ -152,15 +152,10 @@ export class Store {
       for (const entry of normalized.legacyPaneKeyAliasEntries) {
         registerPersistedPaneKeyAlias(entry)
       }
-      // Why: a hook key whose alias was evicted still names a leaf that main's layouts can place.
-      agentHookServer.setLiveLeafOwnerResolver((tabId, leafId) =>
-        findLiveLeafOwnerTabId(
-          this.getWorkspaceSessionHostIds()
-            .filter(isTerminalOwnerPartition)
-            .map((hostId) => this.getWorkspaceSession(hostId)),
-          tabId,
-          leafId
-        )
+      installLiveLeafOwnerResolver(this.runtime, () =>
+        this.getWorkspaceSessionHostIds()
+          .filter(isTerminalOwnerPartition)
+          .map((hostId) => this.getWorkspaceSession(hostId))
       )
       setMigrationUnsupportedPtyPersistenceListener((entries) => {
         this.state.migrationUnsupportedPtyEntries = entries
