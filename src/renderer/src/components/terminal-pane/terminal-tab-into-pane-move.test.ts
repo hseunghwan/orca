@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestStore } from '@/store/slices/store-test-helpers'
 import { createStoreCascadesMockApi } from '@/store/slices/store-cascades-test-harness'
-import { toRemoteRuntimePtyId } from '../../../../shared/remote-runtime-pty-id'
+import { toRemoteRuntimePtyId } from '../../../../shared/remote-runtime/remote-runtime-pty-id'
 import { applyTerminalTabJoin } from './terminal-tab-into-pane-apply'
 import { moveTerminalTabIntoPane } from './terminal-tab-into-pane-move'
 import { createJoinHarness } from './terminal-tab-into-pane-move-harness'
@@ -16,6 +16,9 @@ import {
   TARGET,
   WT
 } from './terminal-tab-into-pane-fixture'
+
+// The window-applied join under test exists only while the layout-owner switch is off.
+vi.mock('../../../../shared/layout-owner-switch', () => ({ ORCA_LAYOUT_OWNER_IS_MAIN: false }))
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), info: vi.fn() } }))
 vi.mock('@/components/terminal-pane/pty-dispatcher', () => ({
