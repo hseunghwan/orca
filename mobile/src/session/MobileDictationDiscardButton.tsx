@@ -1,5 +1,6 @@
 import { Pressable, type PressableProps } from 'react-native'
 import { X } from 'lucide-react-native'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { colors } from '../theme/mobile-theme'
 
 type MobileDictationDiscardButtonProps = {
@@ -16,10 +17,11 @@ export function MobileDictationDiscardButton({
   iconSize,
   strokeWidth
 }: MobileDictationDiscardButtonProps) {
+  const t = useMobileTranslation()
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Discard dictation"
+      accessibilityLabel={t('session.dictation.discard', 'Discard dictation')}
       style={style}
       onPress={onDiscard}
     >

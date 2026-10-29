@@ -18,5 +18,10 @@
   },
   "common": {
     "back": "Back"
+  },
+  "session": {
+    "dictation": {
+      "discard": "Discard dictation"
+    }
   }
 }
