@@ -141,6 +141,11 @@ export function MobileNativeChatComposer({
   const [focused, setFocused] = useState(false)
   const [attachOpen, setAttachOpen] = useState(false)
   const [picker, setPicker] = useState<MobileNativeChatPickerPresentation | null>(null)
+  const pickersHidden = micActive && !micStarting
+  // Hidden pickers can't run their drawer's close, so drop it here or it reopens after the recording.
+  if (pickersHidden && picker) {
+    setPicker(null)
+  }
   const request = sessionOptions?.controller.optionPickerRequest
   const [lastRequest, setLastRequest] = useState(request)
   if (request && lastRequest !== request) {
@@ -314,7 +319,7 @@ export function MobileNativeChatComposer({
               </Pressable>
             ) : null}
             {/* While recording, the meter and discard take the pickers' room in the row. */}
-            {sessionOptions && !(micActive && !micStarting) ? (
+            {sessionOptions && !pickersHidden ? (
               <MobileNativeChatSessionOptionPickers
                 {...sessionOptions}
                 sendInFlight={sending || isAttaching}

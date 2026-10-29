@@ -60,7 +60,7 @@ export function createMobileDictationMeter(): MobileDictationMeter {
 
   // Play windows back at the pace they were captured, so a 500 ms page batch moves the dots smoothly instead of in one jump.
   function tick(): void {
-    const now = Date.now()
+    const now = performance.now()
     creditMs += now - lastTickAt
     lastTickAt = now
     let played = 0
@@ -102,9 +102,9 @@ export function createMobileDictationMeter(): MobileDictationMeter {
       analyzer = createDictationMeterAnalyzerState()
       sampleClockMs = 0
       creditMs = 0
-      lastTickAt = Date.now()
+      lastTickAt = performance.now()
       timer = setInterval(tick, WINDOW_MS)
-      publish({ ...DEFAULT_DICTATION_METER, startedAt: lastTickAt })
+      publish({ ...DEFAULT_DICTATION_METER, startedAt: Date.now() })
     },
     push: (pcm) => {
       if (timer === null) {
