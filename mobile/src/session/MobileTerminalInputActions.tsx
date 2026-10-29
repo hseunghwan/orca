@@ -1,10 +1,11 @@
 import { ActivityIndicator, Pressable, View, type StyleProp, type ViewStyle } from 'react-native'
-import { ImagePlus, Mic, X } from 'lucide-react-native'
+import { ImagePlus, Mic } from 'lucide-react-native'
 import type { MobileDictationMeter } from '../hooks/mobile-dictation-meter'
 import { colors } from '../theme/mobile-theme'
 import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import { keepHeldPressThroughLongPress } from './held-press-long-press'
 import { MobileDictationHalo } from './MobileDictationMeter'
+import { MobileDictationDiscardButton } from './MobileDictationDiscardButton'
 
 type DictationState = {
   readonly isStarting: boolean
@@ -99,14 +100,12 @@ export function MobileTerminalInputActions({
     <>
       {dictation.isRecording ? (
         // Attaching a photo mid-recording isn't useful, so discard takes its slot and the row keeps its width.
-        <Pressable
+        <MobileDictationDiscardButton
+          onDiscard={onDictationCancel}
           style={buttonStyle}
-          onPress={onDictationCancel}
-          accessibilityRole="button"
-          accessibilityLabel="Discard dictation"
-        >
-          <X size={17} color={colors.textPrimary} strokeWidth={2.4} />
-        </Pressable>
+          iconSize={17}
+          strokeWidth={2.4}
+        />
       ) : (
         <Pressable
           style={[buttonStyle, (!canSend || isAttaching) && disabledButtonStyle]}

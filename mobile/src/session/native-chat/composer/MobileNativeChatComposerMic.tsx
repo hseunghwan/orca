@@ -1,9 +1,10 @@
 import { ActivityIndicator, Pressable, View } from 'react-native'
-import { Mic, Square, X } from 'lucide-react-native'
+import { Mic, Square } from 'lucide-react-native'
 import { useContext } from 'react'
 import { colors } from '../../../theme/mobile-theme'
 import { MobileDictationGrapes, MobileDictationTimer } from '../../MobileDictationMeter'
 import { MobileDictationRecordingContext } from '../../mobile-dictation-recording-context'
+import { MobileDictationDiscardButton } from '../../MobileDictationDiscardButton'
 import { keepHeldPressThroughLongPress } from '../../held-press-long-press'
 import { mobileNativeChatComposerStyles as styles } from './mobile-native-chat-composer-styles'
 
@@ -36,18 +37,16 @@ export function MobileNativeChatComposerMic({
   return (
     <>
       {recording ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Discard dictation"
+        <MobileDictationDiscardButton
+          onDiscard={recording.discard}
           style={({ pressed }) => [
             styles.controlButton,
             styles.noShrink,
             pressed && styles.pressed
           ]}
-          onPress={recording.discard}
-        >
-          <X size={18} color={colors.textPrimary} strokeWidth={2} />
-        </Pressable>
+          iconSize={18}
+          strokeWidth={2}
+        />
       ) : null}
       {recording ? (
         <View style={styles.dictationMeter}>

@@ -78,7 +78,7 @@ describe('MobileNativeChatComposerMic', () => {
     expect(mic.props['aria-busy']).toBe(true)
   })
 
-  it('adds discard and the meter beside the mic without remounting it under a held press', () => {
+  it('adds a one-tap discard and the meter beside the mic without remounting it under a held press', () => {
     const discard = vi.fn()
     const controls = { meter: createMobileDictationMeter(), discard }
     const render = (micStarting: boolean) =>
@@ -99,11 +99,14 @@ describe('MobileNativeChatComposerMic', () => {
     const unmountedBefore = pressables.unmounted
     act(() => renderer!.update(render(false)))
     expect(pressables.unmounted).toBe(unmountedBefore)
-    const discardButton = renderer!.root.find(
-      (node) =>
-        String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Discard dictation'
-    )
-    act(() => discardButton.props.onPress())
+    const discardButton = () =>
+      renderer!.root.find(
+        (node) =>
+          String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Discard dictation'
+      )
+    act(() => discardButton().props.onPress())
     expect(discard).toHaveBeenCalledOnce()
+    // A second tap would go idle before the host's cancel lands.
+    expect(discardButton().props.disabled).toBe(true)
   })
 })
