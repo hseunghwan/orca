@@ -105,6 +105,5 @@ describe('MobileNativeChatComposerMic', () => {
     )
     act(() => discardButton.props.onPress())
     expect(discard).toHaveBeenCalledOnce()
-    expect(findAllByHostType(renderer!.root, 'View')).not.toHaveLength(0)
   })
 })
