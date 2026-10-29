@@ -86,7 +86,6 @@ export function MobileSessionCommandDock({
               <MobileTerminalLiveInputStatus
                 dictation={dictation}
                 dictationMode={dictationMode}
-                meter={dictation.meter}
                 isAttaching={isAttaching}
                 liveInputText={liveInputCapture}
               />

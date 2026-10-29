@@ -12,6 +12,7 @@ vi.mock('react-native', async () => {
   const { createElement: h, useEffect } = await import('react')
   return {
     ActivityIndicator: 'ActivityIndicator',
+    AppState: { currentState: 'active', addEventListener: () => ({ remove: () => {} }) },
     AccessibilityInfo: {
       isReduceMotionEnabled: () => Promise.resolve(false),
       addEventListener: () => ({ remove: () => {} })
@@ -78,7 +79,7 @@ describe('MobileNativeChatComposerMic', () => {
     expect(mic.props['aria-busy']).toBe(true)
   })
 
-  it('adds a one-tap discard and the meter beside the mic without remounting it under a held press', () => {
+  it('adds discard and the meter beside the mic without remounting it under a held press', () => {
     const discard = vi.fn()
     const controls = { meter: createMobileDictationMeter(), discard }
     const render = (micStarting: boolean) =>
@@ -106,7 +107,5 @@ describe('MobileNativeChatComposerMic', () => {
       )
     act(() => discardButton().props.onPress())
     expect(discard).toHaveBeenCalledOnce()
-    // A second tap would go idle before the host's cancel lands.
-    expect(discardButton().props.disabled).toBe(true)
   })
 })

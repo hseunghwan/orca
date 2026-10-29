@@ -1,10 +1,11 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 import { Text, View } from 'react-native'
 import { DICTATION_GRAPES } from '../../../src/shared/dictation-audio-meter'
 import {
   useMobileDictationMeterState,
   type MobileDictationMeter
 } from '../hooks/mobile-dictation-meter'
+import { useNow } from '../hooks/use-now'
 import { useReducedMotionEnabled } from '../platform/use-reduced-motion'
 import { colors, typography } from '../theme/mobile-theme'
 import { themedStyleSheet } from '../theme/themed-styles'
@@ -12,11 +13,16 @@ import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 
 type MeterProps = { readonly meter: MobileDictationMeter }
 
-// Desktop's nine dots, red while the mic clips; Reduce Motion holds them still.
-export function MobileDictationGrapes({ meter, dotSize }: MeterProps & { dotSize: number }) {
+// Reduce Motion holds the level at rest; clipping still tints.
+function useMeterEnergy(meter: MobileDictationMeter): { energy: number; isClipping: boolean } {
   useMobileColorScheme()
   const { level, isClipping } = useMobileDictationMeterState(meter)
-  const energy = useReducedMotionEnabled() === false ? level : 0
+  return { energy: useReducedMotionEnabled() === false ? level : 0, isClipping }
+}
+
+// Desktop's nine dots, red while the mic clips.
+export function MobileDictationGrapes({ meter, dotSize }: MeterProps & { dotSize: number }) {
+  const { energy, isClipping } = useMeterEnergy(meter)
   return (
     <View
       style={styles.grapes}
@@ -47,13 +53,7 @@ export function MobileDictationGrapes({ meter, dotSize }: MeterProps & { dotSize
 export function MobileDictationTimer({ meter }: MeterProps) {
   useMobileColorScheme()
   const startedAt = useSyncExternalStore(meter.subscribe, () => meter.getSnapshot().startedAt)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
-  useEffect(() => {
-    const update = () => setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)))
-    update()
-    const timer = setInterval(update, 250)
-    return () => clearInterval(timer)
-  }, [startedAt])
+  const elapsedSeconds = Math.max(0, Math.floor((useNow(250) - startedAt) / 1000))
   const minutes = Math.floor(elapsedSeconds / 60)
   const seconds = String(elapsedSeconds % 60).padStart(2, '0')
   return <Text style={styles.timer}>{`${minutes}:${seconds}`}</Text>
@@ -61,9 +61,7 @@ export function MobileDictationTimer({ meter }: MeterProps) {
 
 // The buffered command field has no status row, so its mic carries the level as a halo; it overlays the mic's box at the origin.
 export function MobileDictationHalo({ meter, size }: MeterProps & { size: number }) {
-  useMobileColorScheme()
-  const { level, isClipping } = useMobileDictationMeterState(meter)
-  const energy = useReducedMotionEnabled() === false ? level : 0
+  const { energy, isClipping } = useMeterEnergy(meter)
   return (
     <View
       pointerEvents="none"

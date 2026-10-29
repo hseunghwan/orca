@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useDictationCapture } from '../platform/dictation-capture'
 import { useMobileDictationMeter } from './mobile-dictation-meter'
 import { MobileDictationPendingAudioBudget } from './mobile-dictation-pending-audio-budget'
@@ -12,7 +12,11 @@ import {
   MOBILE_DICTATION_INPUT_CLOSED_ERROR_MESSAGE,
   MOBILE_DICTATION_INTERRUPTED_ERROR_MESSAGE,
   createMobileDictationId,
-  isCurrentMobileDictationFinish
+  isCurrentMobileDictationFinish,
+  joinWhileInFlight,
+  type DictationStatus,
+  type UseMobileDictationOptions,
+  type UseMobileDictationResult
 } from './mobile-dictation-session-state'
 import {
   cancelDesktopDictation,
@@ -20,11 +24,6 @@ import {
 } from './mobile-dictation-desktop-start'
 import { dictationSessionFinish } from '../dictation/mobile-dictation-operations'
 import { rpcPayloadMember } from '../transport/rpc-reader-payload'
-import type {
-  DictationStatus,
-  UseMobileDictationOptions,
-  UseMobileDictationResult
-} from './mobile-dictation-session-state'
 
 export type { UseMobileDictationResult } from './mobile-dictation-session-state'
 
@@ -285,7 +284,7 @@ export function useMobileDictation(options: UseMobileDictationOptions): UseMobil
     [applyStatus, closeDictationAudio, reportError]
   )
 
-  const cancel = useCallback(() => abandonDictation(null), [abandonDictation])
+  const cancel = useMemo(() => joinWhileInFlight(() => abandonDictation(null)), [abandonDictation])
 
   useEffect(() => {
     // Finish what was already streamed; only the user's own cancel may discard it.

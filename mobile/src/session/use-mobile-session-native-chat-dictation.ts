@@ -140,14 +140,12 @@ export function useMobileSessionNativeChatDictation(
       if (showNativeChatRef.current || chatDictationDestination.current) {
         const insert = chatDictationDestination.current
         chatDictationDestination.current = undefined
-        if (insert) {
-          if (insert(text) === false) {
-            keepUndeliveredDictation(text)
-          }
-        } else {
+        if (!insert) {
           nativeChatController.setChatComposerText((current) =>
             appendBufferedDictation(current, text)
           )
+        } else if (insert(text) === false) {
+          keepUndeliveredDictation(text)
         }
         return
       }

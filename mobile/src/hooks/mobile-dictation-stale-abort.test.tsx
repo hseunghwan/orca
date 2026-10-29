@@ -161,6 +161,29 @@ describe('an abort whose desktop cancel answers after a newer dictation is recor
   })
 })
 
+describe('a second user cancel while the first waits on the host', () => {
+  it('joins the first instead of going idle before the host lets go of the session', async () => {
+    const rpc = createFakeRpcClient()
+    act(() => {
+      create(createElement(Probe, { client: rpc, enabled: true }))
+    })
+    await reachRecording(rpc)
+    const pendingCancel: { request: SentRequest | null } = { request: null }
+    await act(async () => {
+      void dictation().cancel()
+      await pumpHolding(rpc, 'speech.dictation.cancel', pendingCancel)
+      void dictation().cancel()
+      await pump(rpc)
+    })
+    expect(dictation().status).toBe('recording')
+    await act(async () => {
+      pendingCancel.request?.resolve({ id: 'desktop', ok: true, result: {} })
+      await pump(rpc)
+    })
+    expect(dictation().status).toBe('idle')
+  })
+})
+
 describe('a capture open that rejects after the composer already closed the start', () => {
   it('keeps the closure the abort reported instead of walking it back to idle', async () => {
     const rpc = createFakeRpcClient()

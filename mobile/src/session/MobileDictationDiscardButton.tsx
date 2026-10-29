@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Pressable, type PressableProps } from 'react-native'
 import { X } from 'lucide-react-native'
 import { colors } from '../theme/mobile-theme'
@@ -10,25 +9,19 @@ type MobileDictationDiscardButtonProps = {
   readonly strokeWidth: number
 }
 
-// One tap only: recording stays up until the host's cancel lands, and a second tap would go idle before it, so a quick restart hits the session the host still holds.
+// Chat and terminal share one discard control so its label and role stay alike.
 export function MobileDictationDiscardButton({
   onDiscard,
   style,
   iconSize,
   strokeWidth
 }: MobileDictationDiscardButtonProps) {
-  const [discarding, setDiscarding] = useState(false)
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Discard dictation"
-      aria-busy={discarding}
-      disabled={discarding}
       style={style}
-      onPress={() => {
-        setDiscarding(true)
-        onDiscard()
-      }}
+      onPress={onDiscard}
     >
       <X size={iconSize} color={colors.textPrimary} strokeWidth={strokeWidth} />
     </Pressable>

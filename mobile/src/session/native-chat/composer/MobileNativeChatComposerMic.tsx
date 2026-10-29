@@ -37,22 +37,22 @@ export function MobileNativeChatComposerMic({
   return (
     <>
       {recording ? (
-        <MobileDictationDiscardButton
-          onDiscard={recording.discard}
-          style={({ pressed }) => [
-            styles.controlButton,
-            styles.noShrink,
-            pressed && styles.pressed
-          ]}
-          iconSize={18}
-          strokeWidth={2}
-        />
-      ) : null}
-      {recording ? (
-        <View style={styles.dictationMeter}>
-          <MobileDictationGrapes meter={recording.meter} dotSize={5} />
-          <MobileDictationTimer meter={recording.meter} />
-        </View>
+        <>
+          <MobileDictationDiscardButton
+            onDiscard={recording.discard}
+            style={({ pressed }) => [
+              styles.controlButton,
+              styles.noShrink,
+              pressed && styles.pressed
+            ]}
+            iconSize={18}
+            strokeWidth={2}
+          />
+          <View style={styles.dictationMeter}>
+            <MobileDictationGrapes meter={recording.meter} dotSize={5} />
+            <MobileDictationTimer meter={recording.meter} />
+          </View>
+        </>
       ) : null}
       <Pressable
         accessibilityRole="button"

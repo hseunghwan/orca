@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native'
-import type { MobileDictationMeter } from '../hooks/mobile-dictation-meter'
+import type { UseMobileDictationResult } from '../hooks/mobile-dictation-session-state'
 import { colors, typography } from '../theme/mobile-theme'
 import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import { themedStyleSheet } from '../theme/themed-styles'
@@ -10,9 +10,8 @@ import {
 import { MobileDictationGrapes, MobileDictationTimer } from './MobileDictationMeter'
 
 type MobileTerminalLiveInputStatusProps = {
-  readonly dictation: MobileDictationStatusFlags
+  readonly dictation: MobileDictationStatusFlags & Pick<UseMobileDictationResult, 'meter'>
   readonly dictationMode: string | undefined
-  readonly meter: MobileDictationMeter
   readonly isAttaching: boolean
   readonly liveInputText: string
 }
@@ -20,7 +19,6 @@ type MobileTerminalLiveInputStatusProps = {
 export function MobileTerminalLiveInputStatus({
   dictation,
   dictationMode,
-  meter,
   isAttaching,
   liveInputText
 }: MobileTerminalLiveInputStatusProps) {
@@ -46,9 +44,9 @@ export function MobileTerminalLiveInputStatus({
         </Text>
         {dictation.isRecording ? (
           <>
-            <MobileDictationTimer meter={meter} />
+            <MobileDictationTimer meter={dictation.meter} />
             <View style={styles.spacer} />
-            <MobileDictationGrapes meter={meter} dotSize={3.5} />
+            <MobileDictationGrapes meter={dictation.meter} dotSize={3.5} />
           </>
         ) : null}
       </View>

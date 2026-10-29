@@ -35,6 +35,15 @@ export const MOBILE_DICTATION_INPUT_CLOSED_ERROR_MESSAGE =
 export const MOBILE_DICTATION_INTERRUPTED_ERROR_MESSAGE =
   'Voice dictation stopped because the microphone was interrupted. Try again.'
 
+// A repeat while the first run is in flight joins it: a second cancel would otherwise go idle before the host's cancel lands, and the host refuses a restart until then.
+export function joinWhileInFlight(run: () => Promise<void>): () => Promise<void> {
+  let inFlight: Promise<void> | null = null
+  return () =>
+    (inFlight ??= run().finally(() => {
+      inFlight = null
+    }))
+}
+
 export function bytesToBase64(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString('base64')
 }
