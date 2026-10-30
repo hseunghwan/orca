@@ -291,7 +291,10 @@ describe('moveMobileSessionLeafToNewTab on a headless host', () => {
 
 describe('moveMobileSessionLeafToNewTab on a host with a window', () => {
   afterEach(() => setRuntimeDesktopSurface(null))
-  async function setupWithWindow(movePaneToNewTab?: RuntimeNotifier['movePaneToNewTab']) {
+  async function setupWithWindow(
+    movePaneToNewTab?: RuntimeNotifier['movePaneToNewTab'],
+    moveTabIntoPane?: RuntimeNotifier['moveTabIntoPane']
+  ) {
     const context = await setup()
     context.runtime.setNotifier({
       worktreesChanged: vi.fn(),
@@ -304,7 +307,8 @@ describe('moveMobileSessionLeafToNewTab on a host with a window', () => {
       closeTerminal: vi.fn(),
       terminalFitOverrideChanged: vi.fn(),
       terminalDriverChanged: vi.fn(),
-      ...(movePaneToNewTab ? { movePaneToNewTab } : {})
+      ...(movePaneToNewTab ? { movePaneToNewTab } : {}),
+      ...(moveTabIntoPane ? { moveTabIntoPane } : {})
     })
     setRuntimeDesktopSurface({
       showNotification: () => false,
@@ -342,6 +346,32 @@ describe('moveMobileSessionLeafToNewTab on a host with a window', () => {
     const { commit, move } = await setupWithWindow()
     await expect(move()).resolves.toEqual({ status: 'not_held' })
     expect(commit).not.toHaveBeenCalled()
+  })
+  it("has the window join a client's tab into another tab's pane, and answers with its result", async () => {
+    const moveTabIntoPane = vi.fn(async () => ({ status: 'moved' as const }))
+    const { runtime, getSession } = await setupWithWindow(undefined, moveTabIntoPane)
+    const before = getSession()
+    const join = { sourceTabId: 'other-tab', targetTabId: 'host-tab', side: 'right' as const }
+    await expect(
+      runtime.moveMobileSessionTabIntoPane(`id:${TEST_WORKTREE_ID}`, join)
+    ).resolves.toEqual({ status: 'moved' })
+    expect(moveTabIntoPane).toHaveBeenCalledWith({ worktreeId: TEST_WORKTREE_ID, ...join })
+    expect(getSession()).toBe(before)
+  })
+})
+
+describe('moveMobileSessionTabIntoPane on a headless host', () => {
+  it('answers not_held and leaves the session alone, since no window can apply the join', async () => {
+    const { runtime, getSession } = await setup()
+    const before = getSession()
+    await expect(
+      runtime.moveMobileSessionTabIntoPane(`id:${TEST_WORKTREE_ID}`, {
+        sourceTabId: 'other-tab',
+        targetTabId: 'host-tab',
+        side: 'bottom'
+      })
+    ).resolves.toEqual({ status: 'not_held' })
+    expect(getSession()).toBe(before)
   })
 })
 

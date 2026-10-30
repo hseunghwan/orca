@@ -5,7 +5,7 @@ import { createStoreCascadesMockApi } from '@/store/slices/store-cascades-test-h
 import { moveTerminalTabIntoPane } from './terminal-tab-into-pane-move'
 import { createJoinHarness, mainSessionAfterJoin } from './terminal-tab-into-pane-move-harness'
 import { isTerminalTabMoveInFlight } from './terminal-leaf-move-guard'
-import { A, P_A, SOURCE, TARGET, WT } from './terminal-tab-into-pane-fixture'
+import { A, C, P_A, SOURCE, TARGET, WT } from './terminal-tab-into-pane-fixture'
 
 // The window-applied join under test exists only while the layout-owner switch is off.
 vi.mock('../../../../shared/layout-owner-switch', () => ({ ORCA_LAYOUT_OWNER_IS_MAIN: false }))
@@ -185,6 +185,58 @@ describe('moveTerminalTabIntoPane results', () => {
       h.answerWith(() => Promise.reject(new Error('x')))
       await moveTerminalTabIntoPane(join, h.deps)
       expect(isTerminalTabMoveInFlight(SOURCE)).toBe(false)
+    })
+  })
+
+  describe('host-owned tabs', () => {
+    function hostOwnedJoinHarness(hostAnswer: 'moved' | 'refused') {
+      const moveTabIntoPaneOnHost = vi.fn(() => Promise.resolve(hostAnswer))
+      const h = createJoinHarness(createTestStore(), {
+        hostJoinsTabs: () => true,
+        moveTabIntoPaneOnHost
+      })
+      h.store.setState((state) => ({
+        terminalLayoutsByTabId: Object.fromEntries(
+          Object.entries(state.terminalLayoutsByTabId).map(([tabId, layout]) => [
+            tabId,
+            {
+              ...layout,
+              ptyIdsByLeafId: Object.fromEntries(
+                Object.entries(layout.ptyIdsByLeafId ?? {}).map(([leafId, ptyId]) => [
+                  leafId,
+                  `remote:env-1@@${ptyId}`
+                ])
+              )
+            }
+          ])
+        )
+      }))
+      return { h, moveTabIntoPaneOnHost }
+    }
+
+    it('the host joins them: this window neither asks its own main nor applies the join', async () => {
+      const { h, moveTabIntoPaneOnHost } = hostOwnedJoinHarness('moved')
+      await expect(moveTerminalTabIntoPane(join, h.deps)).resolves.toBe('moved')
+      expect(moveTabIntoPaneOnHost).toHaveBeenCalledWith(
+        expect.objectContaining({
+          worktreeId: WT,
+          sourceTabId: SOURCE,
+          targetTabId: TARGET,
+          leafId: A,
+          targetLeafId: C,
+          placement: { kind: 'beside', side: 'right' }
+        })
+      )
+      expect(h.requests).toEqual([])
+      expect(h.calls).toEqual([])
+      expect(isTerminalTabMoveInFlight(SOURCE)).toBe(false)
+    })
+
+    it('a host refusal leaves both tabs and tells the user', async () => {
+      const { h } = hostOwnedJoinHarness('refused')
+      await expect(moveTerminalTabIntoPane(join, h.deps)).resolves.toBe('refused')
+      expect(h.store.getState().tabsByWorktree[WT]?.map((tab) => tab.id)).toEqual([SOURCE, TARGET])
+      expect(toast.error).toHaveBeenCalledTimes(1)
     })
   })
 })

@@ -1,11 +1,21 @@
-import type { TerminalLeafMoveRequest } from '../../../shared/terminal-leaf-move'
-import { SESSION_TABS_MOVE_PANE_TO_NEW_TAB_RUNTIME_CAPABILITY } from '../../../shared/session-tabs-runtime-capabilities'
+import type { RuntimeCapability } from '../../../shared/protocol-version'
+import type {
+  TerminalLeafIntoTabRequest,
+  TerminalLeafMoveRequest
+} from '../../../shared/terminal-leaf-move'
+import {
+  SESSION_TABS_MOVE_PANE_TO_NEW_TAB_RUNTIME_CAPABILITY,
+  SESSION_TABS_MOVE_TAB_INTO_PANE_RUNTIME_CAPABILITY
+} from '../../../shared/session-tabs-runtime-capabilities'
 import { toHostSessionTabId } from '../../../shared/terminal-surface-id'
 import { makePaneKey } from '../../../shared/stable-pane-id'
 import { isRecoverableRemoteRuntimeConnectionError } from '../../../shared/remote-runtime/remote-runtime-client-error-classification'
 import { runtimeEnvironmentIdUnlessTwin } from '../lib/resolve-owner'
 import { useAppStore } from '../store'
-import { runtimeEnvironmentSupportsCapability } from './runtime-rpc-client'
+import {
+  readCachedRuntimeEnvironmentCapability,
+  runtimeEnvironmentSupportsCapability
+} from './runtime-rpc-client'
 import { unwrapRuntimeRpcResult } from './runtime-rpc-result'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
 import {
@@ -14,21 +24,36 @@ import {
 } from './web-runtime-session-environment'
 import { refreshWebRuntimeSessionTabsSnapshot } from './web-runtime-session-snapshot'
 
+function pairedHostOf(worktreeId: string, action: string): string | null {
+  const environmentId = runtimeEnvironmentIdUnlessTwin(useAppStore.getState(), worktreeId, action)
+  return environmentId && isWebRuntimeSessionActive(environmentId) ? environmentId : null
+}
+
 /** The runtime that commits this worktree's pane moves itself; null keeps the move in this window. */
-export async function resolvePaneMoveHost(worktreeId: string): Promise<string | null> {
-  const environmentId = runtimeEnvironmentIdUnlessTwin(
-    useAppStore.getState(),
-    worktreeId,
-    'move a pane to a new tab on its host'
-  )
-  if (!environmentId || !isWebRuntimeSessionActive(environmentId)) {
+export async function resolvePaneMoveHost(
+  worktreeId: string,
+  capability: RuntimeCapability = SESSION_TABS_MOVE_PANE_TO_NEW_TAB_RUNTIME_CAPABILITY
+): Promise<string | null> {
+  const environmentId = pairedHostOf(worktreeId, 'move a pane on its host')
+  if (!environmentId) {
     return null
   }
-  const supported = await runtimeEnvironmentSupportsCapability(
-    environmentId,
-    SESSION_TABS_MOVE_PANE_TO_NEW_TAB_RUNTIME_CAPABILITY
-  ).catch(() => false)
+  const supported = await runtimeEnvironmentSupportsCapability(environmentId, capability).catch(
+    () => false
+  )
   return supported ? environmentId : null
+}
+
+/** Whether this worktree's host joins a tab into a pane, as last probed; a menu cannot wait for a probe. */
+export function hostJoinsTabsIntoPanes(worktreeId: string): boolean {
+  const environmentId = pairedHostOf(worktreeId, 'join a tab into a pane on its host')
+  return (
+    environmentId !== null &&
+    readCachedRuntimeEnvironmentCapability(
+      environmentId,
+      SESSION_TABS_MOVE_TAB_INTO_PANE_RUNTIME_CAPABILITY
+    ) === true
+  )
 }
 
 /** The host's answer to a move; `unknown` when the reply was lost, so the host may have committed. */
@@ -77,6 +102,59 @@ export async function moveWebRuntimeLeafToNewTab(
   }
   console.warn('[web-runtime-session] host did not move the pane', answer)
   return 'refused'
+}
+
+/**
+ * Asks the host to join a single-pane tab into another tab's pane; its window commits and applies
+ * the join, and this window redraws from the host's tabs. An older or headless host refuses.
+ */
+export async function moveWebRuntimeTabIntoPane(
+  request: TerminalLeafIntoTabRequest
+): Promise<HostPaneMoveOutcome> {
+  const environmentId = await resolvePaneMoveHost(
+    request.worktreeId,
+    SESSION_TABS_MOVE_TAB_INTO_PANE_RUNTIME_CAPABILITY
+  )
+  if (!environmentId) {
+    return 'refused'
+  }
+  let outcome: HostPaneMoveOutcome
+  try {
+    const response = await captureRuntimeEnvironmentCall(environmentId)({
+      method: 'session.tabs.moveTabIntoPane',
+      params: {
+        worktree: toRuntimeWorktreeSelector(request.worktreeId),
+        sourceTabId: toHostSessionTabId(request.sourceTabId),
+        targetTabId: toHostSessionTabId(request.targetTabId),
+        targetLeafId: request.targetLeafId,
+        side: request.placement.side
+      },
+      timeoutMs: 15_000
+    })
+    const status =
+      response.ok &&
+      typeof response.result === 'object' &&
+      response.result !== null &&
+      'status' in response.result
+        ? response.result.status
+        : null
+    outcome =
+      status === 'moved' || status === 'unknown'
+        ? status
+        : !response.ok && isRecoverableRemoteRuntimeConnectionError(response.error)
+          ? 'unknown'
+          : 'refused'
+  } catch {
+    outcome = 'unknown'
+  }
+  if (outcome !== 'refused') {
+    await refreshWebRuntimeSessionTabsSnapshot(environmentId, request.worktreeId, {
+      acceptCurrentSnapshot: true
+    })
+  } else {
+    console.warn('[web-runtime-session] host did not join the tab into a pane')
+  }
+  return outcome
 }
 
 /** Whether the host holds the moved pane in its new tab; null when the host cannot be asked. */

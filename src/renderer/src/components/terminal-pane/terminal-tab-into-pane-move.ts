@@ -83,12 +83,15 @@ export async function moveTerminalTabIntoPane(
   deps: TerminalTabIntoPaneDeps
 ): Promise<TerminalTabIntoPaneOutcome> {
   const { sourceTabId, targetTabId, side } = args
-  const eligibility = resolveTerminalTabIntoPaneEligibility(deps.getStore(), args)
+  const eligibility = resolveTerminalTabIntoPaneEligibility(deps.getStore(), {
+    ...args,
+    hostJoinsTabs: deps.hostJoinsTabs
+  })
   if (!eligibility.ok) {
     reportMoveFailed()
     return 'refused'
   }
-  const { worktreeId, leafId, ptyId, targetLeafId } = eligibility
+  const { worktreeId, leafId, ptyId, targetLeafId, viaHost } = eligibility
   // No await sits between the eligibility check and this hold.
   const release = holdTerminalMoveKeys([
     terminalLeafMoveKey(leafId),
@@ -108,6 +111,14 @@ export async function moveTerminalTabIntoPane(
       leafId,
       ptyId,
       placement: { kind: 'beside', side }
+    }
+    if (viaHost) {
+      // The host's window commits and applies the join; this window redraws from the host's tabs.
+      const outcome = await deps.moveTabIntoPaneOnHost(request)
+      if (outcome === 'refused') {
+        reportMoveFailed()
+      }
+      return outcome
     }
     const answer =
       (await deps.moveLeafIntoTab(request).catch((error: unknown) => {

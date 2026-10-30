@@ -16,7 +16,9 @@ import type { TerminalRevealIdentity } from '../../shared/terminal-reveal-identi
 import type { TerminalPaneRevealTarget } from '../../shared/terminal-pane-reveal'
 import type {
   TerminalLeafMoveResult,
-  TerminalPaneMoveToNewTabRequest
+  TerminalPaneMoveToNewTabRequest,
+  TerminalTabIntoPaneHostResult,
+  TerminalTabIntoPaneMoveRequest
 } from '../../shared/terminal-leaf-move'
 import type { TuiAgent } from '../../shared/tui-agent'
 import type { WorkspaceSleepNotice } from '../../shared/workspace-sleep'
@@ -142,6 +144,10 @@ export type RuntimeNotifier = {
   movePaneToNewTab?(
     move: Omit<TerminalPaneMoveToNewTabRequest, 'requestId'>
   ): Promise<TerminalLeafMoveResult>
+  /** The window joins a client's single-pane tab into another tab's pane; rejects when it cannot answer. */
+  moveTabIntoPane?(
+    move: Omit<TerminalTabIntoPaneMoveRequest, 'requestId'>
+  ): Promise<TerminalTabIntoPaneHostResult>
   /** Host window only: host/all move it; caller/clients open without moving it; absence keeps legacy switching. Paired clients never navigate (all means host). */
   openFile?(
     worktreeId: string,

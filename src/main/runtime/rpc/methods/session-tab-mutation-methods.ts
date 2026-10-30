@@ -13,6 +13,7 @@ import {
   ActivateTab,
   MovePaneToNewTab,
   MoveTab,
+  MoveTabIntoPane,
   SetTabProps,
   UpdatePaneLayout
 } from '../../../../shared/rpc-contract/session-tabs-schemas-params'
@@ -131,6 +132,29 @@ export const SESSION_TAB_MUTATION_METHODS = [
           clientCapabilities
         )
       )
+    }
+  }),
+  defineMethod({
+    name: 'session.tabs.moveTabIntoPane',
+    permission: 'workspace',
+    params: MoveTabIntoPane,
+    handler: async (params, { runtime, pairedDeviceId, clientCapabilities, clientKind }) => {
+      for (const tabId of [params.sourceTabId, params.targetTabId]) {
+        await assertVisibleMutationTab(
+          runtime,
+          params.worktree,
+          tabId,
+          pairedDeviceId,
+          clientKind,
+          clientCapabilities
+        )
+      }
+      return runtime.moveMobileSessionTabIntoPane(params.worktree, {
+        sourceTabId: params.sourceTabId,
+        targetTabId: params.targetTabId,
+        ...(params.targetLeafId ? { targetLeafId: params.targetLeafId } : {}),
+        side: params.side
+      })
     }
   }),
   defineMethod({

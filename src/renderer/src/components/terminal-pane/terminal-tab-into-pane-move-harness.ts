@@ -96,6 +96,8 @@ export function createJoinHarness(store: Store, overrides: Partial<TerminalTabIn
       requests.push(request)
       return answer()
     },
+    moveTabIntoPaneOnHost: () => Promise.resolve('refused'),
+    hostJoinsTabs: () => false,
     ...overrides
   }
   return {

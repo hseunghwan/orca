@@ -6,6 +6,7 @@ import {
 import type { SetTerminalPaneTitleDetail, SplitTerminalPaneDetail } from '@/constants/terminal'
 import { getResolvedExecutionHostIdForWorktree } from '@/lib/resolved-worktree-execution-host'
 import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
+import { hostJoinsTabsIntoPanes, moveWebRuntimeTabIntoPane } from '@/runtime/web-runtime-leaf-move'
 import { useAppStore } from '@/store'
 import { moveTerminalTabIntoPane } from './terminal-tab-into-pane-move'
 import type {
@@ -63,7 +64,9 @@ export function createTerminalTabIntoPaneDeps(): TerminalTabIntoPaneDeps {
       window.api.session.get(
         getResolvedExecutionHostIdForWorktree(useAppStore.getState(), worktreeId) ?? undefined
       ),
-    moveLeafIntoTab: (request) => window.api.pty.moveLeafIntoTab(request)
+    moveLeafIntoTab: (request) => window.api.pty.moveLeafIntoTab(request),
+    moveTabIntoPaneOnHost: moveWebRuntimeTabIntoPane,
+    hostJoinsTabs: hostJoinsTabsIntoPanes
   }
 }
 

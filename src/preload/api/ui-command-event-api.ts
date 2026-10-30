@@ -19,10 +19,6 @@ import type {
 import type { AgentLaunchPaneVerdictEvent } from '../../shared/agent-launch-pane-verdict'
 import type { PaneLaunchRecipe } from '../../shared/terminal-attachment-launch-result'
 import type {
-  TerminalPaneMoveToNewTabReply,
-  TerminalPaneMoveToNewTabRequest
-} from '../../shared/terminal-leaf-move'
-import type {
   TerminalPaneRevealReply,
   TerminalPaneRevealRequest
 } from '../../shared/terminal-pane-reveal'
@@ -266,10 +262,6 @@ export type UiCommandEventApi = {
   onMoveSessionTab: (
     callback: (data: { worktreeId: string } & RuntimeMobileSessionTabMove) => void
   ) => () => void
-  onTerminalPaneMoveToNewTabRequest?: (
-    callback: (request: TerminalPaneMoveToNewTabRequest) => void
-  ) => () => void
-  replyTerminalPaneMoveToNewTab?: (reply: TerminalPaneMoveToNewTabReply) => void
   onOpenFileFromMobile: (
     callback: (data: {
       worktreeId: string

@@ -36,6 +36,12 @@ export type TerminalTabIntoPaneDeps = {
     terminalLayoutsByTabId?: Record<string, TerminalLayoutSnapshot>
   } | null>
   moveLeafIntoTab: (request: TerminalLeafIntoTabRequest) => Promise<TerminalLeafIntoTabResult>
+  /** Joins host-owned tabs on their paired host, whose window commits and applies the join. */
+  moveTabIntoPaneOnHost: (
+    request: TerminalLeafIntoTabRequest
+  ) => Promise<TerminalTabIntoPaneOutcome>
+  /** Whether the paired host of host-owned tabs joins them, as last probed. */
+  hostJoinsTabs: (worktreeId: string) => boolean
 }
 
 export type TerminalTabIntoPaneArgs = {
