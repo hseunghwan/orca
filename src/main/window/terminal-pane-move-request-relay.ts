@@ -5,7 +5,10 @@ import type { BrowserWindow } from 'electron'
 import type {
   TerminalLeafMoveResult,
   TerminalPaneMoveToNewTabReply,
-  TerminalPaneMoveToNewTabRequest
+  TerminalPaneMoveToNewTabRequest,
+  TerminalTabIntoPaneHostResult,
+  TerminalTabIntoPaneMoveReply,
+  TerminalTabIntoPaneMoveRequest
 } from '../../shared/workspace-layout/terminal-leaf-move'
 import { addFanoutListener } from '../runtime/events/event-listener-fanout'
 import { abortWhenRendererGone } from '../ipc/renderer-lifetime-abort'
@@ -102,6 +105,63 @@ export function requestTerminalPaneMoveFromRenderer(
       webContents.send('ui:terminalPaneMoveToNewTabRequest', request)
     } catch {
       onRendererUnavailable()
+    }
+  })
+}
+
+/** Asks the window to join a single-pane tab into another tab's pane; rejects when it cannot answer. */
+export function requestTerminalTabIntoPaneFromRenderer(
+  mainWindow: BrowserWindow,
+  move: Omit<TerminalTabIntoPaneMoveRequest, 'requestId'>
+): Promise<TerminalTabIntoPaneHostResult> {
+  if (mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) {
+    return Promise.reject(new Error('renderer_unavailable'))
+  }
+  const webContents = mainWindow.webContents
+  const requestId = randomUUID()
+  return new Promise<TerminalTabIntoPaneHostResult>((resolve, reject) => {
+    let settled = false
+    const releaseListeners: (() => void)[] = []
+    const finish = (error: Error | null, result?: TerminalTabIntoPaneHostResult): void => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(timeout)
+      for (const releaseListener of releaseListeners) {
+        releaseListener()
+      }
+      if (error || !result) {
+        reject(error ?? new Error('terminal_pane_move_failed'))
+      } else {
+        resolve(result)
+      }
+    }
+    const onRendererUnavailable = (): void => finish(new Error('renderer_unavailable'))
+    const timeout = setTimeout(
+      () => finish(new Error('terminal_pane_move_timeout')),
+      TERMINAL_PANE_MOVE_TIMEOUT_MS
+    )
+    const onReply = (event: Electron.IpcMainEvent, reply: TerminalTabIntoPaneMoveReply): void => {
+      // Visible request IDs confer no authority; only the targeted window can answer.
+      if (event.sender !== webContents || reply?.requestId !== requestId) {
+        return
+      }
+      finish(null, reply.result)
+    }
+    const lifetime = abortWhenRendererGone(webContents)
+    lifetime.signal.addEventListener('abort', onRendererUnavailable, { once: true })
+    releaseListeners.push(
+      lifetime.dispose,
+      () => lifetime.signal.removeEventListener('abort', onRendererUnavailable),
+      addFanoutListener(mainWindow, 'closed', onRendererUnavailable),
+      addFanoutListener(ipcMain, 'ui:terminalTabIntoPaneReply', onReply)
+    )
+    const request: TerminalTabIntoPaneMoveRequest = { ...move, requestId }
+    try {
+      webContents.send('ui:terminalTabIntoPaneRequest', request)
+    } catch {
+      finish(new Error('renderer_unavailable'))
     }
   })
 }

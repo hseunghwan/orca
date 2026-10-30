@@ -38,7 +38,10 @@ const args = { sourceTabId: SOURCE, targetTabId: TARGET, isWebClient: false }
 
 function refusal(
   state: TerminalTabIntoPaneState,
-  patch: Partial<typeof args> & { targetLeafId?: string } = {}
+  patch: Partial<typeof args> & {
+    targetLeafId?: string
+    hostJoinsTabs?: (worktreeId: string) => boolean
+  } = {}
 ) {
   const result = resolveTerminalTabIntoPaneEligibility(state, { ...args, ...patch })
   return result.ok ? 'eligible' : result.reason
@@ -51,7 +54,8 @@ describe('resolveTerminalTabIntoPaneEligibility (spec 4.3)', () => {
       worktreeId: WT,
       leafId: A,
       ptyId: P_A,
-      targetLeafId: C
+      targetLeafId: C,
+      viaHost: false
     })
   })
 
@@ -236,6 +240,26 @@ describe('resolveTerminalTabIntoPaneEligibility (spec 4.3)', () => {
       }
     })
     expect(refusal(remoteTarget)).toBe('host_authoritative')
+    expect(refusal(remoteSource, { hostJoinsTabs: () => true })).toBe('host_authoritative')
+  })
+
+  it('hands host-owned tabs to a host that joins them', () => {
+    const hostJoinsTabs = vi.fn(() => true)
+    const remoteBoth = intoPaneState({
+      terminalLayoutsByTabId: {
+        [SOURCE]: { ...sourceLayout(), ptyIdsByLeafId: { [A]: 'remote:env-1@@terminal-1' } },
+        [TARGET]: {
+          ...targetLayout(),
+          ptyIdsByLeafId: { [B]: 'remote:env-1@@terminal-2', [C]: 'remote:env-1@@terminal-3' }
+        }
+      }
+    })
+    expect(
+      resolveTerminalTabIntoPaneEligibility(remoteBoth, { ...args, hostJoinsTabs })
+    ).toMatchObject({ ok: true, viaHost: true, targetLeafId: C })
+    expect(hostJoinsTabs).toHaveBeenCalledWith(WT)
+    expect(refusal(remoteBoth, { hostJoinsTabs: () => false })).toBe('host_authoritative')
+    expect(refusal(intoPaneState(), { isWebClient: true, hostJoinsTabs })).toBe('eligible')
   })
 
   describe('move in flight', () => {

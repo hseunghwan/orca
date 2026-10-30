@@ -17,6 +17,7 @@ import {
 } from '@/components/terminal-pane/terminal-tab-into-pane-eligibility'
 import { describeTerminalTabIntoPaneRefusal } from '@/components/terminal-pane/terminal-tab-into-pane-reasons'
 import { resolveTerminalTabTitle } from '../../../../shared/tab-title-resolution'
+import { hostJoinsTabsIntoPanes } from '@/runtime/web-runtime-leaf-move'
 import { useAppStore } from '../../store'
 import type { AppState } from '../../store/types'
 
@@ -60,7 +61,8 @@ export function TerminalTabMoveIntoTabMenuSection({
   const eligibilities = targets.map((target) =>
     resolveTerminalTabIntoPaneEligibility(inputs, {
       sourceTabId: tabId,
-      targetTabId: target.id
+      targetTabId: target.id,
+      hostJoinsTabs: hostJoinsTabsIntoPanes
     })
   )
   // A refusal that comes from the source alone would repeat on every target, so it sits on the trigger.

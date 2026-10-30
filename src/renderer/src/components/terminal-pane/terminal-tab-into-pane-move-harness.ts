@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
 import type { SetTerminalPaneTitleDetail, SplitTerminalPaneDetail } from '@/constants/terminal'
-import type { TerminalLeafIntoTabResult } from '../../../../shared/terminal-leaf-move'
-import type { TerminalLayoutSnapshot } from '../../../../shared/terminal-tab-types'
+import type { TerminalLeafIntoTabResult } from '../../../../shared/workspace-layout/terminal-leaf-move'
+import type { TerminalLayoutSnapshot } from '../../../../shared/workspace-layout/terminal-tab-types'
 import {
   makeTab,
   makeWorktree,
@@ -96,6 +96,8 @@ export function createJoinHarness(store: Store, overrides: Partial<TerminalTabIn
       requests.push(request)
       return answer()
     },
+    moveTabIntoPaneOnHost: () => Promise.resolve('refused'),
+    hostJoinsTabs: () => false,
     ...overrides
   }
   return {

@@ -41,7 +41,15 @@ export type TerminalTabIntoPaneRefusal =
   | 'move_in_flight'
 
 export type TerminalTabIntoPaneEligibility =
-  | { ok: true; worktreeId: string; leafId: string; ptyId: string; targetLeafId: string }
+  | {
+      ok: true
+      worktreeId: string
+      leafId: string
+      ptyId: string
+      targetLeafId: string
+      /** Both tabs live on a paired host, which makes the join in its own window. */
+      viaHost: boolean
+    }
   | { ok: false; reason: TerminalTabIntoPaneRefusal }
 
 const SOURCE_WIDE_REFUSALS: ReadonlySet<TerminalTabIntoPaneRefusal> = new Set([
@@ -99,6 +107,8 @@ export function resolveTerminalTabIntoPaneEligibility(
     targetTabId: string
     targetLeafId?: string | null
     isWebClient?: boolean
+    /** Whether the worktree's paired host joins host-owned tabs itself, as last probed. */
+    hostJoinsTabs?: (worktreeId: string) => boolean
   }
 ): TerminalTabIntoPaneEligibility {
   const { sourceTabId, targetTabId } = args
@@ -141,13 +151,17 @@ export function resolveTerminalTabIntoPaneEligibility(
     return refuse('no_terminal')
   }
   const isWebClient = args.isWebClient ?? isWebClientLocation()
-  if (
-    isHostAuthoritativeLayout({
-      isWebClient,
-      ptyIdsByLeafId: { ...sourceLayout?.ptyIdsByLeafId, [leafId]: ptyId }
-    }) ||
-    isHostAuthoritativeLayout({ isWebClient, ptyIdsByLeafId: targetLayout?.ptyIdsByLeafId })
-  ) {
+  const sourceOnHost = isHostAuthoritativeLayout({
+    isWebClient,
+    ptyIdsByLeafId: { ...sourceLayout?.ptyIdsByLeafId, [leafId]: ptyId }
+  })
+  const targetOnHost = isHostAuthoritativeLayout({
+    isWebClient,
+    ptyIdsByLeafId: targetLayout?.ptyIdsByLeafId
+  })
+  // A host-owned layout changes only on its host; a join this window drew alone would revert.
+  const viaHost = sourceOnHost && targetOnHost && args.hostJoinsTabs?.(source.worktreeId) === true
+  if ((sourceOnHost || targetOnHost) && !viaHost) {
     return refuse('host_authoritative')
   }
   if (source.pendingActivationSpawn) {
@@ -188,5 +202,5 @@ export function resolveTerminalTabIntoPaneEligibility(
   ) {
     return refuse('move_in_flight')
   }
-  return { ok: true, worktreeId: source.worktreeId, leafId, ptyId, targetLeafId }
+  return { ok: true, worktreeId: source.worktreeId, leafId, ptyId, targetLeafId, viaHost }
 }

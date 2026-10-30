@@ -12,8 +12,10 @@ import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../shared/layout-owner-switch'
 import {
   isTerminalLeafMoveRequest,
   type TerminalLeafMoveRequest,
-  type TerminalLeafMoveResult
+  type TerminalLeafMoveResult,
+  type TerminalTabIntoPaneHostResult
 } from '../../../shared/workspace-layout/terminal-leaf-move'
+import type { PaneSide } from '../../../shared/workspace-layout/terminal-pane-tree'
 
 /** Where the client dropped the new tab, in the host's group ids. */
 export type MovedPanePlacement = { targetGroupId: string; index?: number }
@@ -82,6 +84,21 @@ export abstract class OrcaRuntimeWithHeadlessPaneMoveToNewTab extends OrcaRuntim
       this.notifyMobileSessionTabsChanged(worktreeId)
     }
     return result
+  }
+
+  // Why: joining a client's tab into a pane closes a tab and regrafts another, which only a window
+  // that owns the layout can apply; a headless host answers not_held and the client keeps both tabs.
+  async moveMobileSessionTabIntoPane(
+    worktreeSelector: string,
+    args: { sourceTabId: string; targetTabId: string; targetLeafId?: string; side: PaneSide }
+  ): Promise<TerminalTabIntoPaneHostResult> {
+    if (!this.getAvailableAuthoritativeWindow() || !this.notifier?.moveTabIntoPane) {
+      return { status: 'not_held' }
+    }
+    const explicitWorktreeId = this.getExplicitSessionWorktreeIdSelector(worktreeSelector)
+    const worktreeId =
+      explicitWorktreeId ?? (await this.resolveWorkspaceSelector(worktreeSelector)).id
+    return this.notifier.moveTabIntoPane({ worktreeId, ...args })
   }
 
   /**

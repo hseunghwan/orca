@@ -64,6 +64,15 @@ export const uiClipboardAndWindowControlsApi = {
   replyTerminalPaneMoveToNewTab: (reply) => {
     ipcRenderer.send('ui:terminalPaneMoveToNewTabReply', reply)
   },
+  onTerminalTabIntoPaneRequest: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, request: Parameters<typeof callback>[0]) =>
+      callback(request)
+    ipcRenderer.on('ui:terminalTabIntoPaneRequest', listener)
+    return () => ipcRenderer.removeListener('ui:terminalTabIntoPaneRequest', listener)
+  },
+  replyTerminalTabIntoPane: (reply) => {
+    ipcRenderer.send('ui:terminalTabIntoPaneReply', reply)
+  },
   onWorkspaceSleep: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, notice: Parameters<typeof callback>[0]) =>
       callback(notice)

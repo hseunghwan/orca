@@ -49,6 +49,25 @@ export type TerminalPaneMoveToNewTabRequest = {
 
 export type TerminalPaneMoveToNewTabReply = { requestId: string; result: TerminalLeafMoveResult }
 
+/** Main asks its window to join a client's single-pane tab into another tab's pane, in the host's tab ids. */
+export type TerminalTabIntoPaneMoveRequest = {
+  requestId: string
+  worktreeId: string
+  sourceTabId: string
+  targetTabId: string
+  /** Without it the window joins beside the target's active pane. */
+  targetLeafId?: string
+  side: PaneSide
+}
+
+/** A host's answer to a client's join; `unknown` when its window may have committed without finishing. */
+export type TerminalTabIntoPaneHostResult = { status: 'moved' | 'refused' | 'unknown' | 'not_held' }
+
+export type TerminalTabIntoPaneMoveReply = {
+  requestId: string
+  result: TerminalTabIntoPaneHostResult
+}
+
 export function terminalLeafMovePaneKeys(request: TerminalLeafMoveRequest): {
   from: PaneKey
   to: PaneKey

@@ -3,8 +3,8 @@ import type { SetTerminalPaneTitleDetail, SplitTerminalPaneDetail } from '@/cons
 import type {
   TerminalLeafIntoTabRequest,
   TerminalLeafIntoTabResult
-} from '../../../../shared/terminal-leaf-move'
-import type { TerminalLayoutSnapshot } from '../../../../shared/terminal-tab-types'
+} from '../../../../shared/workspace-layout/terminal-leaf-move'
+import type { TerminalLayoutSnapshot } from '../../../../shared/workspace-layout/terminal-tab-types'
 import type { PaneSide } from '../../../../shared/workspace-layout/terminal-pane-tree'
 import type { TerminalTabIntoPaneState } from './terminal-tab-into-pane-eligibility'
 
@@ -36,6 +36,12 @@ export type TerminalTabIntoPaneDeps = {
     terminalLayoutsByTabId?: Record<string, TerminalLayoutSnapshot>
   } | null>
   moveLeafIntoTab: (request: TerminalLeafIntoTabRequest) => Promise<TerminalLeafIntoTabResult>
+  /** Joins host-owned tabs on their paired host, whose window commits and applies the join. */
+  moveTabIntoPaneOnHost: (
+    request: TerminalLeafIntoTabRequest
+  ) => Promise<TerminalTabIntoPaneOutcome>
+  /** Whether the paired host of host-owned tabs joins them, as last probed. */
+  hostJoinsTabs: (worktreeId: string) => boolean
 }
 
 export type TerminalTabIntoPaneArgs = {
