@@ -98,7 +98,9 @@ export abstract class OrcaRuntimeWithHeadlessPaneMoveToNewTab extends OrcaRuntim
     const explicitWorktreeId = this.getExplicitSessionWorktreeIdSelector(worktreeSelector)
     const worktreeId =
       explicitWorktreeId ?? (await this.resolveWorkspaceSelector(worktreeSelector)).id
-    return this.notifier.moveTabIntoPane({ worktreeId, ...args })
+    return this.notifier
+      .moveTabIntoPane({ worktreeId, ...args })
+      .catch((): TerminalTabIntoPaneHostResult => ({ status: 'refused' }))
   }
 
   /**

@@ -373,6 +373,19 @@ describe('moveMobileSessionLeafToNewTab on a host with a window', () => {
     expect(moveTabIntoPane).toHaveBeenCalledWith({ worktreeId: TEST_WORKTREE_ID, ...join })
     expect(getSession()).toBe(before)
   })
+
+  it('refuses a join the window cannot answer, rather than failing the call', async () => {
+    const { runtime } = await setupWithWindow(undefined, () =>
+      Promise.reject(new Error('renderer_unavailable'))
+    )
+    await expect(
+      runtime.moveMobileSessionTabIntoPane(`id:${TEST_WORKTREE_ID}`, {
+        sourceTabId: 'other-tab',
+        targetTabId: 'host-tab',
+        side: 'right'
+      })
+    ).resolves.toEqual({ status: 'refused' })
+  })
 })
 
 describe('moveMobileSessionTabIntoPane on a headless host', () => {
