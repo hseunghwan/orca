@@ -358,6 +358,31 @@ describe('moveMobileSessionLeafToNewTab on a host with a window', () => {
     expect(moveTabIntoPane).toHaveBeenCalledWith({ worktreeId: TEST_WORKTREE_ID, ...join })
     expect(getSession()).toBe(before)
   })
+
+  it.each(['renderer_unavailable', 'terminal_pane_move_timeout'])(
+    'refuses the move when the window cannot answer (%s), so the client puts the pane back',
+    async (reason) => {
+      const { commit, move } = await setupWithWindow(() => Promise.reject(new Error(reason)))
+      await expect(move('host-new-tab')).resolves.toEqual({
+        status: 'refused',
+        reason: 'pane_unavailable'
+      })
+      expect(commit).not.toHaveBeenCalled()
+    }
+  )
+
+  it('refuses a join the window cannot answer, rather than failing the call', async () => {
+    const { runtime } = await setupWithWindow(undefined, () =>
+      Promise.reject(new Error('renderer_unavailable'))
+    )
+    await expect(
+      runtime.moveMobileSessionTabIntoPane(`id:${TEST_WORKTREE_ID}`, {
+        sourceTabId: 'other-tab',
+        targetTabId: 'host-tab',
+        side: 'right'
+      })
+    ).resolves.toEqual({ status: 'refused' })
+  })
 })
 
 describe('moveMobileSessionTabIntoPane on a headless host', () => {

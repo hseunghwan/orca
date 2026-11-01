@@ -39,7 +39,9 @@ export abstract class OrcaRuntimeWithHeadlessPaneMoveToNewTab extends OrcaRuntim
       if (!isValidHostTerminalTabId(args.targetTabId)) {
         return { status: 'refused', reason: 'invalid_request' }
       }
-      return this.notifier.movePaneToNewTab({ worktreeId, ...args, ...placement })
+      return this.notifier
+        .movePaneToNewTab({ worktreeId, ...args, ...placement })
+        .catch((): TerminalLeafMoveResult => ({ status: 'refused', reason: 'pane_unavailable' }))
     }
     this.hydrateHeadlessMobileSessionTabsFromWorkspaceSession(worktreeId)
     // Why: the client's pty id mirrors a host handle, so the host names its own live pty; an SSH
@@ -89,7 +91,9 @@ export abstract class OrcaRuntimeWithHeadlessPaneMoveToNewTab extends OrcaRuntim
     const explicitWorktreeId = this.getExplicitSessionWorktreeIdSelector(worktreeSelector)
     const worktreeId =
       explicitWorktreeId ?? (await this.resolveWorkspaceSelector(worktreeSelector)).id
-    return this.notifier.moveTabIntoPane({ worktreeId, ...args })
+    return this.notifier
+      .moveTabIntoPane({ worktreeId, ...args })
+      .catch((): TerminalTabIntoPaneHostResult => ({ status: 'refused' }))
   }
 
   /**
