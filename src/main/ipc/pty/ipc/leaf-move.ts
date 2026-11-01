@@ -54,6 +54,9 @@ export function installPtyLeafMoveIpcHandler(deps: {
   store?: Store
   runtime?: OrcaRuntimeService
 }): void {
+  // Window reactivation re-registers; drop the previous handlers first.
+  getPtyIpc().removeHandler('pty:moveLeafToNewTab')
+  getPtyIpc().removeHandler('pty:moveLeafIntoTab')
   getPtyIpc().handle('pty:moveLeafToNewTab', async (_event, args: unknown) => {
     if (!isTerminalLeafMoveRequest(args)) {
       return { status: 'refused', reason: 'invalid_request' } satisfies TerminalLeafMoveResult
