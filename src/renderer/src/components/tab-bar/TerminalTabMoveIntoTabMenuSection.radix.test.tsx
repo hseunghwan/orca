@@ -4,11 +4,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 import {
   intoPaneState,
   SOURCE,
@@ -69,15 +65,22 @@ function renderOpenMenu(): void {
   const root = createRoot(container)
   act(() => {
     root.render(
-      <DropdownMenu open modal={false}>
-        <DropdownMenuTrigger>menu</DropdownMenuTrigger>
-        <DropdownMenuContent>
+      <ContextMenu>
+        <ContextMenuTrigger data-testid="menu-trigger">menu</ContextMenuTrigger>
+        <ContextMenuContent>
           <TerminalTabMoveIntoTabMenuSection tabId={SOURCE} worktreeId={WT} />
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </ContextMenuContent>
+      </ContextMenu>
     )
   })
   mounted.push({ container, root })
+  act(() => {
+    container
+      .querySelector('[data-testid="menu-trigger"]')
+      ?.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 1, clientY: 1 })
+      )
+  })
 }
 
 function menuItem(name: string): HTMLElement {
