@@ -1,4 +1,4 @@
-import type { AgentStartupShell } from '../../../src/shared/tui-agent-startup-shell'
+import type { AgentStartupShell } from '../../../src/shared/agent-launch/startup/tui-agent-startup-shell'
 
 /**
  * A command that prints `marker` then the shell's own pid. The typed line never holds the marker

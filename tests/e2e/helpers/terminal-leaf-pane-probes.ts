@@ -1,6 +1,6 @@
 import { expect } from '@stablyai/playwright-test'
 import type { Page } from '@stablyai/playwright-test'
-import type { AgentStartupShell } from '../../../src/shared/tui-agent-startup-shell'
+import type { AgentStartupShell } from '../../../src/shared/agent-launch/startup/tui-agent-startup-shell'
 import { resolveWindowsShellStartupFamily } from '../../../src/shared/windows-terminal-shell'
 import { shellPidEchoCommand } from './shell-pid-echo-command'
 import { execInTerminal } from './terminal'
