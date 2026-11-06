@@ -1,17 +1,28 @@
-import { describe, expect, it, vi } from 'vitest'
-import { OrcaRuntimeService } from './orca-runtime-test-mocks.spec'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import './orca-runtime-tests/runtime-test-module-registration.spec'
+import { OrcaRuntimeService } from './orca-runtime'
+import { setRuntimeDesktopSurface } from './runtime-desktop-surface'
 import {
   HEADLESS_LEAF_ID,
+  TEST_WINDOW_ID,
   TEST_WORKTREE_ID,
   makeRuntimeStoreWithWorkspaceSession,
   makeWorkspaceSessionWithHeadlessTerminal
-} from './orca-runtime-test-fixtures.spec'
+} from './orca-runtime-tests/orca-runtime-test-fixtures.spec'
 import type { RuntimeStore } from './runtime-store-contract'
+import type { RuntimeNotifier } from './runtime-notifier-contract'
 import { planTerminalLeafMove } from '../persistence/terminal-topology/terminal-leaf-move'
-import type { TerminalLeafMoveRequest } from '../../shared/terminal-leaf-move'
-import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
+import type { TerminalLeafMoveRequest } from '../../shared/workspace-layout/terminal-leaf-move'
+import type { WorkspaceSessionState } from '../../shared/workspace-session/workspace-session-state-types'
 import type { Tab } from '../../shared/tab-types'
-import { ownedEditorFileId } from '../../shared/workspace-session-pane-ownership'
+import { ownedEditorFileId } from '../../shared/workspace-session/workspace-session-pane-ownership'
+
+const layoutOwner = vi.hoisted(() => ({ isMain: false }))
+vi.mock('../../shared/layout-owner-switch', () => ({
+  get ORCA_LAYOUT_OWNER_IS_MAIN() {
+    return layoutOwner.isMain
+  }
+}))
 
 const SIBLING_LEAF_ID = '33333333-3333-4333-8333-333333333333'
 const OTHER_LEAF_ID = '44444444-4444-4444-8444-444444444444'
@@ -284,6 +295,86 @@ describe('moveMobileSessionLeafToNewTab on a headless host', () => {
     expect(getSession()).toBe(before)
     expect(commit).not.toHaveBeenCalled()
     expect(published).toHaveLength(0)
+  })
+})
+
+describe('moveMobileSessionLeafToNewTab on a host with a window', () => {
+  afterEach(() => setRuntimeDesktopSurface(null))
+  async function setupWithWindow(movePaneToNewTab?: RuntimeNotifier['movePaneToNewTab']) {
+    const context = await setup()
+    context.runtime.setNotifier({
+      worktreesChanged: vi.fn(),
+      reposChanged: vi.fn(),
+      activateWorktree: vi.fn(),
+      createTerminal: vi.fn(),
+      splitTerminal: vi.fn(),
+      renameTerminal: vi.fn(),
+      focusTerminal: vi.fn(),
+      closeTerminal: vi.fn(),
+      terminalFitOverrideChanged: vi.fn(),
+      terminalDriverChanged: vi.fn(),
+      ...(movePaneToNewTab ? { movePaneToNewTab } : {})
+    })
+    setRuntimeDesktopSurface({
+      showNotification: () => false,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the move only asks whether a live window exists.
+      findWindowById: () => ({ isDestroyed: () => false }) as never,
+      onIpc: () => {},
+      removeIpcListener: () => {}
+    })
+    context.runtime.attachWindow(TEST_WINDOW_ID)
+    return context
+  }
+
+  it('has the window move the pane under the tab id the client drew, and answers with its result', async () => {
+    const movePaneToNewTab = vi.fn(async () => ({ status: 'moved' as const, ptyId: 'sibling-pty' }))
+    const { getSession, commit, move } = await setupWithWindow(movePaneToNewTab)
+    const before = getSession()
+    await expect(move('host-new-tab', { targetGroupId: 'group-1', index: 0 })).resolves.toEqual({
+      status: 'moved',
+      ptyId: 'sibling-pty'
+    })
+    expect(movePaneToNewTab).toHaveBeenCalledWith({
+      worktreeId: TEST_WORKTREE_ID,
+      sourceTabId: 'host-tab',
+      targetTabId: 'host-new-tab',
+      leafId: SIBLING_LEAF_ID,
+      targetGroupId: 'group-1',
+      index: 0
+    })
+    // The window commits through its own leaf-move IPC; main does not write the layout here.
+    expect(commit).not.toHaveBeenCalled()
+    expect(getSession()).toBe(before)
+  })
+
+  it('leaves the pane to the client when the window cannot be asked to move it', async () => {
+    const { commit, move } = await setupWithWindow()
+    await expect(move()).resolves.toEqual({ status: 'not_held' })
+    expect(commit).not.toHaveBeenCalled()
+  })
+
+  it('leaves the pane to the client when main owns the layout and would name the new tab itself', async () => {
+    layoutOwner.isMain = true
+    try {
+      const movePaneToNewTab = vi.fn(async () => ({ status: 'moved' as const, ptyId: null }))
+      const { commit, move } = await setupWithWindow(movePaneToNewTab)
+      await expect(move('host-new-tab')).resolves.toEqual({ status: 'not_held' })
+      expect(movePaneToNewTab).not.toHaveBeenCalled()
+      expect(commit).not.toHaveBeenCalled()
+    } finally {
+      layoutOwner.isMain = false
+    }
+  })
+
+  it('refuses the move when the window cannot answer, so the client puts the pane back', async () => {
+    const { commit, move } = await setupWithWindow(() =>
+      Promise.reject(new Error('terminal_pane_move_timeout'))
+    )
+    await expect(move('host-new-tab')).resolves.toEqual({
+      status: 'refused',
+      reason: 'pane_unavailable'
+    })
+    expect(commit).not.toHaveBeenCalled()
   })
 })
 

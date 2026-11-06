@@ -2,10 +2,10 @@ import type { WorkspaceAttentionSlice } from '@/store/slices/workspace-attention
 import type { NotificationWorkspaceOwner } from '../../../../shared/notification-source'
 import type { PanePtyBinding } from './pty-connection/pane-pty-binding'
 import type { IDisposable } from '@xterm/xterm'
-import type { ParsedAgentStatusPayload } from '../../../../shared/agent-status-types'
-import type { TerminalKittyKeyboardModeTracker } from '../../../../shared/terminal-kitty-keyboard-mode-tracker'
+import type { ParsedAgentStatusPayload } from '../../../../shared/agent-status/contracts/agent-status-types'
+import type { TerminalKittyKeyboardModeTracker } from '../../../../shared/terminal/protocol/input-modes/terminal-kitty-keyboard-mode-tracker'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import type { TerminalLayoutSnapshot } from '../../../../shared/terminal-tab-types'
+import type { TerminalLayoutSnapshot } from '../../../../shared/workspace-layout/terminal-tab-types'
 import type {
   PaneExternalDropHandler,
   PaneExternalDropResolver,
@@ -19,6 +19,7 @@ import type { ReplayingPanesRef } from './replay-guard'
 import type { TerminalLinkActionRequester } from './terminal-link-action-request'
 import type { TerminalLinkRoutingPreferenceRequester } from './terminal-url-link-hit-testing'
 import type { SessionRestoredBannerReason } from './session-restored-banner-pane-state'
+import type { DetachTerminalPaneToNewTab } from './terminal-pane-tab-detach'
 
 export type TerminalPaneStartup = Exclude<PtyPaneStartup, null>
 
@@ -117,4 +118,5 @@ export type UseTerminalPaneLifecycleDeps = {
   setPaneLayoutRevision: React.Dispatch<React.SetStateAction<number>>
   resolveExternalPaneDropTarget?: PaneExternalDropResolver
   onExternalPaneDrop?: PaneExternalDropHandler
+  detachPaneToNewTab?: DetachTerminalPaneToNewTab
 }
