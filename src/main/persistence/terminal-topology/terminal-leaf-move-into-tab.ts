@@ -5,7 +5,10 @@ import {
   type TerminalLeafIntoTabRequest,
   type TerminalLeafIntoTabResult
 } from '../../../shared/workspace-layout/terminal-leaf-move'
-import type { TerminalLayoutSnapshot, TerminalTab } from '../../../shared/workspace-layout/terminal-tab-types'
+import type {
+  TerminalLayoutSnapshot,
+  TerminalTab
+} from '../../../shared/workspace-layout/terminal-tab-types'
 import type { WorkspaceSessionState } from '../../../shared/workspace-session/workspace-session-state-types'
 import { closeTerminalSurfaceInWorkspaceSession } from '../../runtime/terminal/surface/terminal-surface-close'
 import { layoutContainsLeafId } from '../restoring-sessions/terminal-layout-normalization'

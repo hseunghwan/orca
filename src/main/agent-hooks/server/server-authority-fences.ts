@@ -1,5 +1,8 @@
 import { clearPaneCacheState } from '../../../shared/agent-hook-listener/listener-state'
-import { parseLegacyNumericPaneKey, parsePaneKey } from '../../../shared/workspace-layout/stable-pane-id'
+import {
+  parseLegacyNumericPaneKey,
+  parsePaneKey
+} from '../../../shared/workspace-layout/stable-pane-id'
 import { AgentHookServerAuthorityAliases } from './server-authority-aliases'
 import { resolveLeafAliasFallback, type LiveLeafOwnerResolver } from './server-leaf-alias-fallback'
 import type {
