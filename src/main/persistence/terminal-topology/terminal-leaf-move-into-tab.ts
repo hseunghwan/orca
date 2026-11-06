@@ -13,7 +13,9 @@ import type { WorkspaceSessionState } from '../../../shared/workspace-session/wo
 import { closeTerminalSurfaceInWorkspaceSession } from '../../runtime/terminal/surface/terminal-surface-close'
 import { layoutContainsLeafId } from '../restoring-sessions/terminal-layout-normalization'
 import { leafHeldByOtherTab, moveRecordKey } from './terminal-leaf-move'
+import { pruneMovedLeafFromSourceTab } from './terminal-leaf-source-prune'
 import {
+  advanceTerminalTopologyRevision,
   isTerminalOwnerPartition,
   type TerminalSessionPartition
 } from './terminal-topology-membership'
@@ -35,9 +37,18 @@ function isOnlyLeaf(layout: TerminalLayoutSnapshot, leafId: string): boolean {
   return layout.root?.type === 'leaf' && layout.root.leafId === leafId
 }
 
-function sourceRefusal(holders: SourceHolder[], leafId: string): TerminalLeafIntoTabRefusal | null {
-  if (holders.some(({ sourceLayout }) => !isOnlyLeaf(sourceLayout, leafId))) {
-    return 'source_not_single_leaf'
+function sourceRefusal(
+  holders: SourceHolder[],
+  request: TerminalLeafIntoTabRequest
+): TerminalLeafIntoTabRefusal | null {
+  const { leafId } = request
+  const onlyLeaf = holders.map(({ sourceLayout }) => isOnlyLeaf(sourceLayout, leafId))
+  // Every holder must agree whether the source tab closes; the window draws one answer.
+  if (onlyLeaf.some((only) => only !== onlyLeaf[0])) {
+    return 'partition_mismatch'
+  }
+  if (request.keepsSourcePane && onlyLeaf[0]) {
+    return 'last_pane'
   }
   if (
     holders.some(
@@ -93,55 +104,16 @@ function targetRefusal(
   return mismatched ? 'partition_mismatch' : null
 }
 
-function joinInPartition(
-  { session, sourceTab, sourceLayout }: SourceHolder,
+function leaveSource(
+  joined: WorkspaceSessionState,
+  { sourceLayout }: SourceHolder,
   request: TerminalLeafIntoTabRequest,
   ptyId: string
 ): { session: WorkspaceSessionState; stale: string[] } | TerminalLeafIntoTabRefusal {
-  const { worktreeId, sourceTabId, targetTabId, targetLeafId, leafId, placement } = request
-  const targetLayout = session.terminalLayoutsByTabId[targetTabId]
-  const grafted =
-    targetLayout &&
-    graftLeafBeside({
-      target: targetLayout,
-      source: sourceLayout,
-      leafId,
-      targetLeafId,
-      side: placement.side,
-      ptyId,
-      fallbackTitle: sourceTab.customTitle
-    })
-  if (!grafted) {
-    return 'target_leaf_missing'
-  }
-  const { from, to } = terminalLeafMovePaneKeys(request)
-  const boundHere = sourceLayout.ptyIdsByLeafId?.[leafId]
-  const localOnly = session.localOnlyScrollbackByTabId
-  const scrollback = localOnly?.[sourceTabId]?.[leafId]
-  // Re-keyed from the originals before the source closes: the close deletes by `S:` prefix and tabId.
-  const joined: WorkspaceSessionState = {
-    ...session,
-    terminalLayoutsByTabId: { ...session.terminalLayoutsByTabId, [targetTabId]: grafted },
-    ...(scrollback !== undefined
-      ? {
-          localOnlyScrollbackByTabId: {
-            ...localOnly,
-            [targetTabId]: { ...localOnly?.[targetTabId], [leafId]: scrollback }
-          }
-        }
-      : {}),
-    // A stale copy's incarnation belongs to the PTY it no longer names.
-    terminalPtyIncarnationsByPaneKey: moveRecordKey(
-      session.terminalPtyIncarnationsByPaneKey,
-      from,
-      boundHere && boundHere !== ptyId ? null : to
-    ),
-    sleepingAgentSessionsByPaneKey: moveRecordKey(
-      session.sleepingAgentSessionsByPaneKey,
-      from,
-      to,
-      (record) => ({ ...record, paneKey: to, tabId: targetTabId })
-    )
+  const { worktreeId, sourceTabId, leafId } = request
+  if (!isOnlyLeaf(sourceLayout, leafId)) {
+    const pruned = pruneMovedLeafFromSourceTab(joined, request, sourceLayout, ptyId)
+    return { session: advanceTerminalTopologyRevision(pruned, worktreeId), stale: [] }
   }
   const closed = closeTerminalSurfaceInWorkspaceSession(
     joined,
@@ -158,11 +130,81 @@ function joinInPartition(
   return { session: closed.session, stale: closed.ptyIdsToKill }
 }
 
+type LocalOnlyScrollback = WorkspaceSessionState['localOnlyScrollbackByTabId']
+
+/** The local-only scrollback with the leaf's buffer under the target tab; undefined when it has none. */
+function moveLeafScrollback(
+  localOnly: LocalOnlyScrollback,
+  { sourceTabId, targetTabId, leafId }: TerminalLeafIntoTabRequest
+): LocalOnlyScrollback {
+  const { [leafId]: scrollback, ...sourceLeft } = localOnly?.[sourceTabId] ?? {}
+  if (scrollback === undefined) {
+    return undefined
+  }
+  const next = {
+    ...localOnly,
+    [targetTabId]: { ...localOnly?.[targetTabId], [leafId]: scrollback }
+  }
+  if (Object.keys(sourceLeft).length > 0) {
+    next[sourceTabId] = sourceLeft
+  } else {
+    delete next[sourceTabId]
+  }
+  return next
+}
+
+function joinInPartition(
+  holder: SourceHolder,
+  request: TerminalLeafIntoTabRequest,
+  ptyId: string
+): { session: WorkspaceSessionState; stale: string[] } | TerminalLeafIntoTabRefusal {
+  const { session, sourceTab, sourceLayout } = holder
+  const { targetTabId, targetLeafId, leafId, placement } = request
+  const targetLayout = session.terminalLayoutsByTabId[targetTabId]
+  const grafted =
+    targetLayout &&
+    graftLeafBeside({
+      target: targetLayout,
+      source: sourceLayout,
+      leafId,
+      targetLeafId,
+      side: placement.side,
+      ptyId,
+      // The tab's name stands for its only pane, never for one of several.
+      fallbackTitle: isOnlyLeaf(sourceLayout, leafId) ? sourceTab.customTitle : null
+    })
+  if (!grafted) {
+    return 'target_leaf_missing'
+  }
+  const { from, to } = terminalLeafMovePaneKeys(request)
+  const boundHere = sourceLayout.ptyIdsByLeafId?.[leafId]
+  const localOnlyScrollbackByTabId = moveLeafScrollback(session.localOnlyScrollbackByTabId, request)
+  // Re-keyed from the originals before the source closes: the close deletes by `S:` prefix and tabId.
+  const joined: WorkspaceSessionState = {
+    ...session,
+    terminalLayoutsByTabId: { ...session.terminalLayoutsByTabId, [targetTabId]: grafted },
+    ...(localOnlyScrollbackByTabId ? { localOnlyScrollbackByTabId } : {}),
+    // A stale copy's incarnation belongs to the PTY it no longer names.
+    terminalPtyIncarnationsByPaneKey: moveRecordKey(
+      session.terminalPtyIncarnationsByPaneKey,
+      from,
+      boundHere && boundHere !== ptyId ? null : to
+    ),
+    sleepingAgentSessionsByPaneKey: moveRecordKey(
+      session.sleepingAgentSessionsByPaneKey,
+      from,
+      to,
+      (record) => ({ ...record, paneKey: to, tabId: targetTabId })
+    )
+  }
+  return leaveSource(joined, holder, request, ptyId)
+}
+
 /**
- * Joins a single-leaf tab's leaf into an existing tab beside one of its leaves and closes the
- * source tab, in one session write per owner partition. The leaf id and the PTY are kept; the
- * target owns the PTY before the source closes, so the close never lists it for a kill. The
- * renderer applies the move only after main reports it committed.
+ * Moves a leaf into an existing tab beside one of its leaves, in one session write per owner
+ * partition. A source tab left empty closes in the same write; one with other leaves keeps them.
+ * The leaf id and the PTY are kept; the target owns the PTY before the source closes, so the close
+ * never lists it for a kill. The renderer applies the move only after main reports it committed.
  */
 export function planTerminalLeafMoveIntoTab(
   partitions: readonly TerminalSessionPartition[],
@@ -191,7 +233,7 @@ export function planTerminalLeafMoveIntoTab(
   if (holders.length === 0) {
     return stopped({ status: 'not_held' })
   }
-  const refusal = sourceRefusal(holders, leafId) ?? targetRefusal(owners, holders, request)
+  const refusal = sourceRefusal(holders, request) ?? targetRefusal(owners, holders, request)
   if (refusal) {
     return refuse(refusal)
   }
@@ -217,7 +259,11 @@ export function planTerminalLeafMoveIntoTab(
     joined.stale.forEach((id) => stale.add(id))
   }
   return {
-    result: { status: 'moved', ptyId, sourceTabClosed: true },
+    result: {
+      status: 'moved',
+      ptyId,
+      sourceTabClosed: holders.every(({ sourceLayout }) => isOnlyLeaf(sourceLayout, leafId))
+    },
     sessions,
     staleDroppedPtyIds: [...stale]
   }

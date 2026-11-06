@@ -43,26 +43,14 @@ function withTabRow(
 }
 
 describe('a join into an existing tab refuses', () => {
-  it('source_not_single_leaf unless the source layout is exactly the moved leaf', () => {
-    const session = intoTabSession()
-    session.terminalLayoutsByTabId[SOURCE] = {
-      root: {
-        type: 'split',
-        direction: 'vertical',
-        first: { type: 'leaf', leafId: A },
-        second: { type: 'leaf', leafId: C }
-      },
-      activeLeafId: A,
-      expandedLeafId: null,
-      ptyIdsByLeafId: { [A]: 'pty-a', [C]: 'pty-sibling' }
-    }
-    expect(refusalOf(localPartition(session))).toEqual({
+  it('last_pane when the caller keeps the source tab but the leaf is its only one', () => {
+    expect(refusalOf(localPartition(intoTabSession()), { keepsSourcePane: true })).toEqual({
       status: 'refused',
-      reason: 'source_not_single_leaf'
+      reason: 'last_pane'
     })
   })
 
-  it('source_not_single_leaf when only one holder partition shows a split source', () => {
+  it('partition_mismatch when one holder partition shows a split source and another does not', () => {
     const ssh = toSshExecutionHostId('ssh-1')
     const split = intoTabSession()
     split.terminalLayoutsByTabId[SOURCE] = {
@@ -79,7 +67,7 @@ describe('a join into an existing tab refuses', () => {
       { hostId: 'local' as const, session: intoTabSession() },
       { hostId: ssh, session: split }
     ]
-    expect(refusalOf(partitions)).toEqual({ status: 'refused', reason: 'source_not_single_leaf' })
+    expect(refusalOf(partitions)).toEqual({ status: 'refused', reason: 'partition_mismatch' })
   })
 
   it('source_is_chat for a chat leaf and for a chat-view source tab', () => {

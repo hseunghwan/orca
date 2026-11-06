@@ -47,7 +47,7 @@ describe('moveTerminalTabIntoPane results', () => {
 
   it('a main refusal applies nothing and tells the user', async () => {
     const h = createJoinHarness(createTestStore())
-    h.answerWith(() => Promise.resolve({ status: 'refused', reason: 'source_not_single_leaf' }))
+    h.answerWith(() => Promise.resolve({ status: 'refused', reason: 'last_pane' }))
 
     await expect(moveTerminalTabIntoPane(join, h.deps)).resolves.toBe('refused')
 

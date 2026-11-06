@@ -16,6 +16,7 @@ import {
   openStore,
   ownersOf,
   SOURCE,
+  seedSplitSource,
   TARGET,
   tabsHoldingLeaf,
   TO,
@@ -42,6 +43,8 @@ vi.mock('electron', () => ({
 }))
 
 afterEach(closeMoveTestStores)
+
+const THIRD = '33333333-3333-4333-8333-333333333333'
 
 const request: TerminalLeafIntoTabRequest = {
   worktreeId: WT,
@@ -108,6 +111,33 @@ describe('Store.moveTerminalLeafIntoTab', () => {
     expect(ownersOf(restarted, 'pty-agent')).toEqual([TO])
     expect(ownersOf(restarted, 'pty-left')).toEqual([`${TARGET}:${LEFT}`])
     expect(restarted.closedTerminalTabTombstonesByTabId?.[SOURCE]).toBeDefined()
+  })
+
+  it('moves one pane of a split source and keeps the source tab with its other pane, across a restart', async () => {
+    const dataFile = newDataFile()
+    const store = openStore(dataFile)
+    store.addRepo(makeRepo({ id: 'repo-1', path: '/tmp/move-worktree' }))
+    await seedSplitSource(store)
+    await store.persistPtyBinding({
+      worktreeId: WT,
+      tabId: TARGET,
+      leafId: THIRD,
+      ptyId: 'pty-third',
+      incarnationId: 'inc-third'
+    })
+
+    await expect(
+      store.moveTerminalLeafIntoTab({ ...request, targetLeafId: THIRD, keepsSourcePane: true })
+    ).resolves.toEqual({ status: 'moved', ptyId: 'pty-agent', sourceTabClosed: false })
+
+    store.flush()
+    const restarted = openStore(dataFile).getWorkspaceSession()
+    expect(restarted.tabsByWorktree[WT]?.map((tab) => tab.id)).toEqual([SOURCE, TARGET])
+    expect(tabsHoldingLeaf(restarted, MOVED)).toEqual([TARGET])
+    expect(tabsHoldingLeaf(restarted, LEFT)).toEqual([SOURCE])
+    expect(ownersOf(restarted, 'pty-agent')).toEqual([TO])
+    expect(ownersOf(restarted, 'pty-left')).toEqual([`${SOURCE}:${LEFT}`])
+    expect(restarted.closedTerminalTabTombstonesByTabId?.[SOURCE]).toBeUndefined()
   })
 
   // The hook server persists its aliases on a debounce; nothing here calls it.

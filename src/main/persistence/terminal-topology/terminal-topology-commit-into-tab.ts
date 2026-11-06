@@ -12,9 +12,9 @@ import { traced, type TerminalTopologyCommitContext } from './terminal-topology-
 import { assignWorkspaceSessionPartition } from './terminal-topology-membership'
 
 /**
- * Joins a leaf into an existing tab and closes the emptied source tab, with the pane-keyed profile
- * records and the physical-key alias, in one durable mutation. Kept apart from the new-tab commit,
- * which is near its size cap.
+ * Moves a leaf into an existing tab, closing the source tab if it empties, with the pane-keyed
+ * profile records and the physical-key alias, in one durable mutation. Kept apart from the new-tab
+ * commit, which is near its size cap.
  */
 export function moveLeafIntoTab(
   request: TerminalLeafIntoTabRequest,

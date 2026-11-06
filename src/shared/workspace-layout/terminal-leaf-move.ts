@@ -49,11 +49,13 @@ export type TerminalPaneMoveToNewTabRequest = {
 
 export type TerminalPaneMoveToNewTabReply = { requestId: string; result: TerminalLeafMoveResult }
 
-/** Main asks its window to join a client's single-pane tab into another tab's pane, in the host's tab ids. */
+/** Main asks its window to join a client's tab or pane into another tab's pane, in the host's tab ids. */
 export type TerminalTabIntoPaneMoveRequest = {
   requestId: string
   worktreeId: string
   sourceTabId: string
+  /** The pane to move, whose tab may keep others; without it the source tab's only pane joins. */
+  sourceLeafId?: string
   targetTabId: string
   /** Without it the window joins beside the target's active pane. */
   targetLeafId?: string
@@ -107,7 +109,10 @@ export function isTerminalLeafMoveRequest(value: unknown): value is TerminalLeaf
 
 const PANE_SIDES: readonly PaneSide[] = ['left', 'right', 'top', 'bottom']
 
-/** Join a single-leaf tab into an existing tab: its leaf becomes a split beside `targetLeafId`. */
+/**
+ * Move a leaf into an existing tab as a split beside `targetLeafId`. The source tab closes when the
+ * leaf was its only one; `keepsSourcePane` asks main to refuse rather than close it.
+ */
 export type TerminalLeafIntoTabRequest = TerminalLeafMoveRequest & {
   targetLeafId: string
   placement: { kind: 'beside'; side: PaneSide }
@@ -116,7 +121,7 @@ export type TerminalLeafIntoTabRequest = TerminalLeafMoveRequest & {
 export type TerminalLeafIntoTabRefusal =
   | 'invalid_request'
   | 'unsupported'
-  | 'source_not_single_leaf'
+  | 'last_pane'
   | 'source_is_chat'
   | 'source_launch_pending'
   | 'target_tab_missing'
@@ -131,8 +136,8 @@ export type TerminalLeafIntoTabRefusal =
   | 'layout_owner_build'
 
 export type TerminalLeafIntoTabResult =
-  /** Main grafted the leaf into the target and closed the source tab in one durable write. */
-  | { status: 'moved'; ptyId: string; sourceTabClosed: true }
+  /** Main grafted the leaf into the target, and closed the source tab if it emptied, in one durable write. */
+  | { status: 'moved'; ptyId: string; sourceTabClosed: boolean }
   /** Main's session never held the leaf; the renderer must not apply the move alone. */
   | { status: 'not_held' }
   | { status: 'refused'; reason: TerminalLeafIntoTabRefusal }

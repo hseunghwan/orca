@@ -105,7 +105,7 @@ describe('pty:moveLeafIntoTab', () => {
 
   it.each<TerminalLeafIntoTabResult>([
     { status: 'not_held' },
-    { status: 'refused', reason: 'source_not_single_leaf' }
+    { status: 'refused', reason: 'last_pane' }
   ])('leaves every pane key alone when nothing was applied (%o)', async (result) => {
     const transfer = vi.spyOn(agentHookServer, 'transferPaneAuthority').mockImplementation(() => {})
     const { store, runtime, rekeyWorkerTerminalResourcePaneKey, restampMovedPtySurface } =

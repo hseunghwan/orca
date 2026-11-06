@@ -12,10 +12,10 @@ import type {
   TerminalTab
 } from '../../../shared/workspace-layout/terminal-tab-types'
 import type { WorkspaceSessionState } from '../../../shared/workspace-session/workspace-session-state-types'
-import { retireLeavesFromTerminalLayout } from '../../../shared/workspace-layout/terminal-layout-leaf-retirement'
 import { createMinimalPersistedTerminalTab } from '../restoring-sessions/session-owner-fields'
 import { layoutContainsLeafId } from '../restoring-sessions/terminal-layout-normalization'
 import { aliasEntriesAfterMove } from './terminal-leaf-move-alias'
+import { pruneMovedLeafFromSourceTab } from './terminal-leaf-source-prune'
 import { writeRestorable } from './restorable-write'
 import type { TerminalTopologyCommitContext } from './terminal-topology-commit'
 import {
@@ -90,8 +90,9 @@ function moveLeafInPartition(
   const tabs = session.tabsByWorktree?.[worktreeId] ?? []
   const { from: fromPaneKey, to: toPaneKey } = terminalLeafMovePaneKeys(request)
   const boundHere = sourceLayout.ptyIdsByLeafId?.[leafId]
-  const remainingLayout = retireLeavesFromTerminalLayout(sourceLayout, new Set([leafId]))
-  const remainingPtyIds = Object.values(remainingLayout?.ptyIdsByLeafId ?? {})
+  const carriesRemoteSession =
+    ptyId !== null && session.remoteSessionIdsByTabId?.[sourceTabId] === ptyId
+  const pruned = pruneMovedLeafFromSourceTab(session, request, sourceLayout, ptyId)
   const row = createMinimalPersistedTerminalTab({
     worktreeId,
     tabId: targetTabId,
@@ -104,14 +105,9 @@ function moveLeafInPartition(
     ptyId,
     ...(sourceTab.shellOverride ? { shellOverride: sourceTab.shellOverride } : {})
   }
-  const nextTabs = tabs.map((tab) =>
-    tab.id === sourceTabId && tab.ptyId === ptyId
-      ? { ...tab, ptyId: remainingPtyIds[0] ?? null }
-      : tab
-  )
   const movedTitle = sourceLayout.titlesByLeafId?.[leafId]
   const terminalLayoutsByTabId = {
-    ...session.terminalLayoutsByTabId,
+    ...pruned.terminalLayoutsByTabId,
     [targetTabId]: {
       root: { type: 'leaf' as const, leafId },
       activeLeafId: leafId,
@@ -121,27 +117,17 @@ function moveLeafInPartition(
       ...(sourceLayout.chatLeafId === leafId ? { chatLeafId: leafId } : {})
     }
   }
-  if (remainingLayout) {
-    terminalLayoutsByTabId[sourceTabId] = remainingLayout
-  } else {
-    // A sibling never bound here can recreate its layout when its own binding arrives.
-    delete terminalLayoutsByTabId[sourceTabId]
-  }
-  const remoteSessionIdsByTabId = { ...session.remoteSessionIdsByTabId }
-  if (ptyId && remoteSessionIdsByTabId[sourceTabId] === ptyId) {
-    remoteSessionIdsByTabId[targetTabId] = ptyId
-    if (remainingPtyIds[0]) {
-      remoteSessionIdsByTabId[sourceTabId] = remainingPtyIds[0]
-    } else {
-      delete remoteSessionIdsByTabId[sourceTabId]
-    }
-  }
   return advanceTerminalTopologyRevision(
     {
-      ...session,
-      tabsByWorktree: { ...session.tabsByWorktree, [worktreeId]: [...nextTabs, targetTab] },
+      ...pruned,
+      tabsByWorktree: {
+        ...pruned.tabsByWorktree,
+        [worktreeId]: [...(pruned.tabsByWorktree[worktreeId] ?? []), targetTab]
+      },
       terminalLayoutsByTabId,
-      ...(session.remoteSessionIdsByTabId ? { remoteSessionIdsByTabId } : {}),
+      ...(carriesRemoteSession
+        ? { remoteSessionIdsByTabId: { ...pruned.remoteSessionIdsByTabId, [targetTabId]: ptyId } }
+        : {}),
       // Stale copies cannot carry another PTY's incarnation to the destination.
       terminalPtyIncarnationsByPaneKey: moveRecordKey(
         session.terminalPtyIncarnationsByPaneKey,
