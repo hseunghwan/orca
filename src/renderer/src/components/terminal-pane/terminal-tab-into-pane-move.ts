@@ -5,7 +5,11 @@ import type {
   TerminalLeafIntoTabResult
 } from '../../../../shared/workspace-layout/terminal-leaf-move'
 import { layoutContainsLeafId } from '../../../../shared/workspace-layout/terminal-pane-tree'
-import { applyTerminalTabJoin } from './terminal-tab-into-pane-apply'
+import {
+  applyTerminalTabJoin,
+  releaseFromSurvivingSource,
+  sourceLayoutAfterMove
+} from './terminal-tab-into-pane-apply'
 import { resolveTerminalTabIntoPaneEligibility } from './terminal-tab-into-pane-eligibility'
 import {
   holdTerminalMoveKeys,
@@ -32,22 +36,41 @@ function closeSourceTab(deps: TerminalTabIntoPaneDeps, sourceTabId: string): voi
   })
 }
 
-/** Main committed but this window could not finish: say so, rebuild T, and drop the ghost source tab. */
+/** Main moved the pane: S lets go of it here, closing when it was S's last pane. */
+function dropMovedPaneFromSource(
+  deps: TerminalTabIntoPaneDeps,
+  request: TerminalLeafIntoTabRequest,
+  ptyId: string
+): void {
+  const store = deps.getStore()
+  const sourceStillHere = Object.values(store.tabsByWorktree)
+    .flat()
+    .some((tab) => tab.id === request.sourceTabId)
+  const layout = store.terminalLayoutsByTabId[request.sourceTabId]
+  // A source that already let go of the pane keeps its other panes.
+  if (!sourceStillHere || (layout && !layoutContainsLeafId(layout.root, request.leafId))) {
+    return
+  }
+  const remaining = sourceLayoutAfterMove(deps, request)
+  if (remaining) {
+    releaseFromSurvivingSource(deps, request, ptyId, remaining)
+  } else {
+    closeSourceTab(deps, request.sourceTabId)
+  }
+}
+
+/** Main committed but this window could not finish: say so, rebuild T, and drop the ghost pane from S. */
 function recoverFromFailedApply(
   deps: TerminalTabIntoPaneDeps,
   request: TerminalLeafIntoTabRequest,
+  ptyId: string,
   error: unknown
 ): void {
   console.warn('[terminal-tab-into-pane] applying a committed join failed', error)
   reportMoveFailed()
   try {
     deps.getStore().remountTerminalTabForRecovery(request.targetTabId)
-    const sourceStillHere = Object.values(deps.getStore().tabsByWorktree)
-      .flat()
-      .some((tab) => tab.id === request.sourceTabId)
-    if (sourceStillHere) {
-      closeSourceTab(deps, request.sourceTabId)
-    }
+    dropMovedPaneFromSource(deps, request, ptyId)
   } catch (recoveryError) {
     console.warn('[terminal-tab-into-pane] recovering from a failed join failed', recoveryError)
   }
@@ -64,25 +87,45 @@ async function settleUnansweredMove(
     layouts?.[request.targetTabId]?.root ?? null,
     request.leafId
   )
-  const inSource = layoutContainsLeafId(
-    layouts?.[request.sourceTabId]?.root ?? null,
-    request.leafId
-  )
+  const sourceLayout = layouts?.[request.sourceTabId]
+  const inSource = layoutContainsLeafId(sourceLayout?.root ?? null, request.leafId)
   return inTarget && !inSource && request.ptyId
-    ? { status: 'moved', ptyId: request.ptyId, sourceTabClosed: true }
+    ? { status: 'moved', ptyId: request.ptyId, sourceTabClosed: sourceLayout === undefined }
     : null
 }
 
+/** A host-owned source keeps showing a moved pane whose PTY lives on; once the host moved it, let it go here. */
+function releaseHostMovedPane(
+  deps: TerminalTabIntoPaneDeps,
+  request: TerminalLeafIntoTabRequest,
+  outcome: TerminalTabIntoPaneOutcome
+): void {
+  const { targetTabId, leafId, ptyId } = request
+  const hostMoved =
+    outcome === 'moved' ||
+    (outcome === 'unknown' &&
+      layoutContainsLeafId(
+        deps.getStore().terminalLayoutsByTabId[targetTabId]?.root ?? null,
+        leafId
+      ))
+  const remaining = hostMoved && ptyId ? sourceLayoutAfterMove(deps, request) : null
+  if (remaining && ptyId) {
+    releaseFromSurvivingSource(deps, request, ptyId, remaining)
+  }
+}
+
 /**
- * Joins a single-pane tab into another tab's pane. Main commits first (and closes the source tab in
- * the same write); this window only rolls forward once main says `moved`. A refusal or `not_held`
- * changes nothing here, and a call that never answers is re-settled from main, never refused.
+ * Joins a tab, or one pane of a tab, into another tab's pane. Main commits first (closing a source
+ * tab it empties in the same write); this window only rolls forward once main says `moved`. A
+ * refusal or `not_held` changes nothing here, and a call that never answers is re-settled from
+ * main, never refused.
  */
 export async function moveTerminalTabIntoPane(
   args: TerminalTabIntoPaneArgs,
   deps: TerminalTabIntoPaneDeps
 ): Promise<TerminalTabIntoPaneOutcome> {
-  const { sourceTabId, targetTabId, side } = args
+  const { source, targetTabId, side } = args
+  const sourceTabId = source.tabId
   const eligibility = resolveTerminalTabIntoPaneEligibility(deps.getStore(), {
     ...args,
     hostJoinsTabs: deps.hostJoinsTabs
@@ -91,7 +134,12 @@ export async function moveTerminalTabIntoPane(
     reportMoveFailed()
     return 'refused'
   }
-  const { worktreeId, leafId, ptyId, targetLeafId, viaHost } = eligibility
+  const { worktreeId, leafId, ptyId, targetLeafId, viaHost, sourceKeepsPanes } = eligibility
+  // Only a mounted pane can let go of its PTY without killing it; main must not commit without one.
+  if (sourceKeepsPanes && !viaHost && !deps.mountedLeafIds(sourceTabId)?.includes(leafId)) {
+    reportMoveFailed()
+    return 'refused'
+  }
   // No await sits between the eligibility check and this hold.
   const release = holdTerminalMoveKeys([
     terminalLeafMoveKey(leafId),
@@ -110,13 +158,17 @@ export async function moveTerminalTabIntoPane(
       targetLeafId,
       leafId,
       ptyId,
-      placement: { kind: 'beside', side }
+      placement: { kind: 'beside', side },
+      // Main must not close a source this window still shows with other panes.
+      ...(sourceKeepsPanes ? { keepsSourcePane: true as const } : {})
     }
     if (viaHost) {
       // The host's window commits and applies the join; this window redraws from the host's tabs.
-      const outcome = await deps.moveTabIntoPaneOnHost(request)
+      const outcome = await deps.moveTabIntoPaneOnHost(request, source)
       if (outcome === 'refused') {
         reportMoveFailed()
+      } else if (sourceKeepsPanes) {
+        releaseHostMovedPane(deps, request, outcome)
       }
       return outcome
     }
@@ -126,16 +178,15 @@ export async function moveTerminalTabIntoPane(
         return null
       })) ?? (await settleUnansweredMove(deps, request))
     if (answer?.status === 'moved') {
-      // Main closed the source in the same write, so every moved result is applied.
       try {
         if (applyTerminalTabJoin(deps, request, answer.ptyId)) {
           return 'moved'
         }
         // T's layout is gone here, so S is only a ghost of a pane main already moved.
         reportMoveFailed()
-        closeSourceTab(deps, request.sourceTabId)
+        dropMovedPaneFromSource(deps, request, answer.ptyId)
       } catch (error) {
-        recoverFromFailedApply(deps, request, error)
+        recoverFromFailedApply(deps, request, answer.ptyId, error)
       }
       return 'unknown'
     }

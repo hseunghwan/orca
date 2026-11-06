@@ -171,7 +171,7 @@ function registerTerminalPaneMoveRequests(unsubs: (() => void)[]): void {
     onTerminalTabIntoPaneRequest(({ requestId, worktreeId, sourceTabId, targetTabId, ...join }) => {
       void moveTerminalTabIntoPaneInApp({
         ...join,
-        sourceTabId: resolveWindowTabIdForHostTab(worktreeId, sourceTabId),
+        source: { kind: 'tab', tabId: resolveWindowTabIdForHostTab(worktreeId, sourceTabId) },
         targetTabId: resolveWindowTabIdForHostTab(worktreeId, targetTabId)
       })
         .catch(() => 'unknown' as const)

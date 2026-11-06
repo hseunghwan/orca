@@ -36,10 +36,16 @@ export type ClosedPaneInfo = {
   reason?: 'close' | 'detach' | 'retire'
 }
 
+/** How the drag overlay marks an external target; a join names itself, or why it is refused. */
+export type PaneExternalDropOverlay =
+  | { kind: 'area' }
+  | { kind: 'insertion' }
+  | { kind: 'join'; label: string; refused: boolean }
+
 export type PaneExternalDropTarget = {
   id: string
-  rect: DOMRect
-  overlayKind?: 'area' | 'insertion'
+  rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>
+  overlay?: PaneExternalDropOverlay
 }
 
 export type PaneExternalDropResolver = (args: {

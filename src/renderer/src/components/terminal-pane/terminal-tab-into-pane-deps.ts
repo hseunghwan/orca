@@ -1,9 +1,14 @@
 import {
+  CLOSE_TERMINAL_PANE_EVENT,
   SET_TERMINAL_PANE_TITLE_EVENT,
   SPLIT_TERMINAL_PANE_EVENT,
   TOGGLE_TERMINAL_PANE_EXPAND_EVENT
 } from '@/constants/terminal'
-import type { SetTerminalPaneTitleDetail, SplitTerminalPaneDetail } from '@/constants/terminal'
+import type {
+  CloseTerminalPaneDetail,
+  SetTerminalPaneTitleDetail,
+  SplitTerminalPaneDetail
+} from '@/constants/terminal'
 import { getResolvedExecutionHostIdForWorktree } from '@/lib/resolved-worktree-execution-host'
 import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
 import { hostJoinsTabsIntoPanes, moveWebRuntimeTabIntoPane } from '@/runtime/web-runtime-leaf-move'
@@ -38,6 +43,10 @@ export function createTerminalTabIntoPaneDeps(): TerminalTabIntoPaneDeps {
     dispatchSplit: (detail) =>
       window.dispatchEvent(
         new CustomEvent<SplitTerminalPaneDetail>(SPLIT_TERMINAL_PANE_EVENT, { detail })
+      ),
+    dispatchClosePane: (detail) =>
+      window.dispatchEvent(
+        new CustomEvent<CloseTerminalPaneDetail>(CLOSE_TERMINAL_PANE_EVENT, { detail })
       ),
     dispatchToggleExpand: (tabId) =>
       window.dispatchEvent(

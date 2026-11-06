@@ -1,9 +1,6 @@
 import type { AppState } from '@/store'
 import { makePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
-import type {
-  TerminalLayoutSnapshot,
-  TerminalTab
-} from '../../../../shared/workspace-layout/terminal-tab-types'
+import type { TerminalTab } from '../../../../shared/workspace-layout/terminal-tab-types'
 import { collectLayoutLeafIdsInOrder } from '../../../../shared/workspace-layout/terminal-pane-tree'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
 import { isWebClientLocation } from '@/lib/web-client-location'
@@ -30,6 +27,7 @@ export type TerminalTabIntoPaneRefusal =
   | 'target_missing'
   | 'worktree_mismatch'
   | 'source_not_single_pane'
+  | 'source_pane_missing'
   | 'source_chat'
   | 'target_chat'
   | 'target_pane_missing'
@@ -43,6 +41,11 @@ export type TerminalTabIntoPaneRefusal =
   | 'host_authoritative'
   | 'move_in_flight'
 
+/** What joins the target: a whole tab, which must hold one pane, or one pane of a tab. */
+export type TerminalJoinSource =
+  | { kind: 'tab'; tabId: string }
+  | { kind: 'pane'; tabId: string; leafId: string }
+
 export type TerminalTabIntoPaneEligibility =
   | {
       ok: true
@@ -52,6 +55,8 @@ export type TerminalTabIntoPaneEligibility =
       targetLeafId: string
       /** Both tabs live on a paired host, which makes the join in its own window. */
       viaHost: boolean
+      /** The source tab holds other panes, so it stays open without the moved one. */
+      sourceKeepsPanes: boolean
     }
   | { ok: false; reason: TerminalTabIntoPaneRefusal }
 
@@ -59,6 +64,7 @@ const SOURCE_WIDE_REFUSALS: ReadonlySet<TerminalTabIntoPaneRefusal> = new Set([
   'layout_owner_build',
   'source_missing',
   'source_not_single_pane',
+  'source_pane_missing',
   'source_chat',
   'no_terminal',
   'pending_spawn',
@@ -90,23 +96,31 @@ function hasQueuedTabWork(state: TerminalTabIntoPaneState, tabId: string): boole
   ].some((byTabId) => tabId in byTabId)
 }
 
-function layoutLeaves(layout: TerminalLayoutSnapshot | undefined): {
-  several: boolean
-  only: string | null
-} {
-  const leafIds = collectLayoutLeafIdsInOrder(layout?.root ?? null)
-  return { several: leafIds.length > 1, only: leafIds.length === 1 ? (leafIds[0] ?? null) : null }
+/** The leaf that moves for this source, or why the source has none to give. */
+function sourceLeafOf(
+  source: TerminalJoinSource,
+  leafIds: string[]
+): { leafId: string } | { refusal: TerminalTabIntoPaneRefusal } | null {
+  if (source.kind === 'pane') {
+    return leafIds.includes(source.leafId)
+      ? { leafId: source.leafId }
+      : { refusal: 'source_pane_missing' }
+  }
+  if (leafIds.length > 1) {
+    return { refusal: 'source_not_single_pane' }
+  }
+  return leafIds[0] ? { leafId: leafIds[0] } : null
 }
 
 /**
- * Whether the single-pane tab `sourceTabId` may join `targetTabId`'s pane. Pure over the store, so
- * a drop target can show its refusal reason and the move can recheck at the moment it runs.
- * Main re-checks what it can see; the checks here are the renderer-only ones it cannot.
+ * Whether `source` may join `targetTabId`'s pane. Pure over the store, so a drop target can show
+ * its refusal reason and the move can recheck at the moment it runs. Main re-checks what it can
+ * see; the checks here are the renderer-only ones it cannot.
  */
 export function resolveTerminalTabIntoPaneEligibility(
   state: TerminalTabIntoPaneState,
   args: {
-    sourceTabId: string
+    source: TerminalJoinSource
     targetTabId: string
     targetLeafId?: string | null
     isWebClient?: boolean
@@ -114,7 +128,8 @@ export function resolveTerminalTabIntoPaneEligibility(
     hostJoinsTabs?: (worktreeId: string) => boolean
   }
 ): TerminalTabIntoPaneEligibility {
-  const { sourceTabId, targetTabId } = args
+  const { source: joinSource, targetTabId } = args
+  const sourceTabId = joinSource.tabId
   const refuse = (reason: TerminalTabIntoPaneRefusal): TerminalTabIntoPaneEligibility => ({
     ok: false,
     reason
@@ -139,14 +154,19 @@ export function resolveTerminalTabIntoPaneEligibility(
   }
   const sourceLayout = state.terminalLayoutsByTabId[sourceTabId]
   const targetLayout = state.terminalLayoutsByTabId[targetTabId]
-  const { several, only: leafId } = layoutLeaves(sourceLayout)
-  if (several) {
-    return refuse('source_not_single_pane')
+  const sourceLeafIds = collectLayoutLeafIdsInOrder(sourceLayout?.root ?? null)
+  const sourceLeaf = sourceLeafOf(joinSource, sourceLeafIds)
+  if (sourceLeaf && 'refusal' in sourceLeaf) {
+    return refuse(sourceLeaf.refusal)
   }
+  const leafId = sourceLeaf?.leafId ?? null
   if (source.viewMode === 'chat' || (leafId && sourceLayout?.chatLeafId === leafId)) {
     return refuse('source_chat')
   }
-  const ptyId = leafId ? (sourceLayout?.ptyIdsByLeafId?.[leafId] ?? source.ptyId) : null
+  // The tab row's PTY stands in only for its only pane; with several it names another one.
+  const ptyId = leafId
+    ? (sourceLayout?.ptyIdsByLeafId?.[leafId] ?? (sourceLeafIds.length === 1 ? source.ptyId : null))
+    : null
   if (!leafId || !ptyId) {
     return refuse('no_terminal')
   }
@@ -206,5 +226,13 @@ export function resolveTerminalTabIntoPaneEligibility(
   ) {
     return refuse('move_in_flight')
   }
-  return { ok: true, worktreeId: source.worktreeId, leafId, ptyId, targetLeafId, viaHost }
+  return {
+    ok: true,
+    worktreeId: source.worktreeId,
+    leafId,
+    ptyId,
+    targetLeafId,
+    viaHost,
+    sourceKeepsPanes: sourceLeafIds.length > 1
+  }
 }

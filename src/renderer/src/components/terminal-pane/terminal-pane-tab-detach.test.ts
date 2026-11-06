@@ -181,7 +181,7 @@ describe('resolveTerminalTabStripDropTarget', () => {
     ).toMatchObject({
       groupId: TARGET_GROUP_ID,
       insertionIndex: 1,
-      overlayKind: 'insertion',
+      overlay: { kind: 'insertion' },
       rect: rect({ left: 80, top: 0, width: 2, height: 32 })
     })
   })

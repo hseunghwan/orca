@@ -18,7 +18,7 @@ vi.mock('@/components/terminal-pane/pty-dispatcher', () => ({
 const mockApi = createStoreCascadesMockApi()
 Object.assign(mockApi, { session: { closeTerminalSurface: vi.fn().mockResolvedValue(undefined) } })
 
-const join = { sourceTabId: SOURCE, targetTabId: TARGET, side: 'right' } as const
+const join = { source: { kind: 'tab', tabId: SOURCE }, targetTabId: TARGET, side: 'right' } as const
 
 beforeEach(() => {
   vi.clearAllMocks()

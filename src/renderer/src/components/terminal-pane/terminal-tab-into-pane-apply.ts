@@ -7,6 +7,7 @@ import {
   layoutContainsLeafId,
   type PaneSide
 } from '../../../../shared/workspace-layout/terminal-pane-tree'
+import { detachTerminalLayoutLeaf } from './terminal-layout-leaf-detach'
 import type { TerminalTabIntoPaneDeps } from './terminal-tab-into-pane-types'
 
 // 'vertical' puts panes side by side, matching the layout tree's insertLeafBeside.
@@ -24,7 +25,8 @@ const SIDE_SPLIT: Record<
 function graftIntoTarget(
   deps: TerminalTabIntoPaneDeps,
   request: TerminalLeafIntoTabRequest,
-  ptyId: string
+  ptyId: string,
+  sourceKeepsPanes: boolean
 ): TerminalLayoutSnapshot | null {
   const store = deps.getStore()
   const { sourceTabId, targetTabId, leafId, targetLeafId, placement } = request
@@ -36,9 +38,12 @@ function graftIntoTarget(
     return { ...target, ptyIdsByLeafId: { ...target.ptyIdsByLeafId, [leafId]: ptyId } }
   }
   const source = store.terminalLayoutsByTabId[sourceTabId]
-  const fallbackTitle = Object.values(store.tabsByWorktree)
-    .flat()
-    .find((tab) => tab.id === sourceTabId)?.customTitle
+  // The tab's name stands for its only pane, never for one of several.
+  const fallbackTitle = sourceKeepsPanes
+    ? null
+    : Object.values(store.tabsByWorktree)
+        .flat()
+        .find((tab) => tab.id === sourceTabId)?.customTitle
   const base = { target, source, leafId, side: placement.side, ptyId, fallbackTitle }
   const anchor = layoutContainsLeafId(target.root, targetLeafId)
     ? targetLeafId
@@ -46,9 +51,56 @@ function graftIntoTarget(
   return anchor ? graftLeafBeside({ ...base, targetLeafId: anchor }) : null
 }
 
+/** The source layout without the moved leaf; null when the leaf was its last. */
+export function sourceLayoutAfterMove(
+  deps: TerminalTabIntoPaneDeps,
+  { sourceTabId, leafId }: TerminalLeafIntoTabRequest
+): TerminalLayoutSnapshot | null {
+  return (
+    detachTerminalLayoutLeaf(deps.getStore().terminalLayoutsByTabId[sourceTabId], leafId)
+      ?.sourceLayout ?? null
+  )
+}
+
 /**
- * Applies a join main has committed: T's layout and PTY binding first, so S's close sees the PTY
- * as shared; then the mounted pane adopts it; S closes last. False when the target is gone here.
+ * Takes the moved pane out of a source tab that keeps other panes: the mounted pane lets go of the
+ * PTY without killing it, the source saves its smaller layout and gives up the PTY to the target.
+ */
+export function releaseFromSurvivingSource(
+  deps: TerminalTabIntoPaneDeps,
+  request: TerminalLeafIntoTabRequest,
+  ptyId: string,
+  remaining: TerminalLayoutSnapshot
+): void {
+  const { sourceTabId, targetTabId, leafId } = request
+  deps.dispatchClosePane({
+    tabId: sourceTabId,
+    leafId,
+    preservePty: true,
+    lastPaneCloseReason: 'cleanup'
+  })
+  // The mounted pane saves its own smaller layout; a source that is not mounted needs it written.
+  if (
+    layoutContainsLeafId(deps.getStore().terminalLayoutsByTabId[sourceTabId]?.root ?? null, leafId)
+  ) {
+    deps.getStore().setTabLayout(sourceTabId, remaining)
+  }
+  if (deps.mountedLeafIds(sourceTabId)?.includes(leafId)) {
+    deps.getStore().remountTerminalTabForRecovery(sourceTabId)
+  }
+  deps.getStore().syncPaneDetachPtyOwnership({
+    detachedLeafId: leafId,
+    detachedPtyId: ptyId,
+    sourceLayout: deps.getStore().terminalLayoutsByTabId[sourceTabId] ?? remaining,
+    sourceTabId,
+    targetTabId
+  })
+}
+
+/**
+ * Applies a join main has committed: T's layout and PTY binding first, so S sees the PTY as
+ * shared; then S lets go of the pane (closing if it emptied) and the mounted T pane adopts it.
+ * False when the target is gone here.
  */
 export function applyTerminalTabJoin(
   deps: TerminalTabIntoPaneDeps,
@@ -61,7 +113,8 @@ export function applyTerminalTabJoin(
   if (deps.getStore().expandedPaneByTabId[targetTabId]) {
     deps.dispatchToggleExpand(targetTabId)
   }
-  const grafted = graftIntoTarget(deps, request, ptyId)
+  const remaining = sourceLayoutAfterMove(deps, request)
+  const grafted = graftIntoTarget(deps, request, ptyId, remaining !== null)
   if (!grafted) {
     return false
   }
@@ -75,6 +128,10 @@ export function applyTerminalTabJoin(
     sourceTabId,
     targetTabId
   })
+  // S's pane detaches before T's adopts it: a detach drops every listener on the PTY.
+  if (remaining) {
+    releaseFromSurvivingSource(deps, request, ptyId, remaining)
+  }
   const mounted = deps.mountedLeafIds(targetTabId)
   if (mounted) {
     const sourceLeafId = mounted.includes(targetLeafId)
@@ -103,13 +160,15 @@ export function applyTerminalTabJoin(
       }
     }
   }
-  deps.getStore().closeTab(sourceTabId, {
-    reason: 'cleanup',
-    recordInteraction: false,
-    captureRecentlyClosed: false,
-    // Main already closed S, and T owns the PTY now.
-    localPtyTeardownOwnedExternally: true
-  })
+  if (!remaining) {
+    deps.getStore().closeTab(sourceTabId, {
+      reason: 'cleanup',
+      recordInteraction: false,
+      captureRecentlyClosed: false,
+      // Main already closed S, and T owns the PTY now.
+      localPtyTeardownOwnedExternally: true
+    })
+  }
   deps.resyncParkedWatchers(worktreeId, targetTabId)
   deps.scheduleGraphSync()
   const store = deps.getStore()

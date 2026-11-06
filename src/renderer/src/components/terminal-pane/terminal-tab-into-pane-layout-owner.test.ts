@@ -13,7 +13,10 @@ describe('moveTerminalTabIntoPane in a layout-owner build', () => {
     const h = createJoinHarness(createTestStore())
 
     await expect(
-      moveTerminalTabIntoPane({ sourceTabId: SOURCE, targetTabId: TARGET, side: 'right' }, h.deps)
+      moveTerminalTabIntoPane(
+        { source: { kind: 'tab', tabId: SOURCE }, targetTabId: TARGET, side: 'right' },
+        h.deps
+      )
     ).resolves.toBe('refused')
 
     expect(h.requests).toHaveLength(0)

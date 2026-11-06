@@ -28,6 +28,7 @@ export function describeTerminalTabIntoPaneRefusal(reason: TerminalTabIntoPaneRe
     case 'layout_owner_build':
     case 'same_tab':
     case 'source_missing':
+    case 'source_pane_missing':
     case 'target_missing':
     case 'target_pane_missing':
     case 'worktree_mismatch':

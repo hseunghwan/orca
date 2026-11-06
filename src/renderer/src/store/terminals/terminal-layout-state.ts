@@ -152,9 +152,14 @@ export function createTerminalLayoutActions(
           sourceTabId,
           sourcePrimaryPtyId
         )
-        const nextTabsByWorktree = detachedPtyId
-          ? withTerminalTabPtyId(sourceTabsByWorktree, targetTabId, detachedPtyId)
-          : sourceTabsByWorktree
+        // A tab the pane joined keeps its own primary PTY; only an empty new tab takes the moved one.
+        const targetHasPrimary = Object.values(s.tabsByWorktree).some((tabs) =>
+          tabs.some((tab) => tab.id === targetTabId && tab.ptyId)
+        )
+        const nextTabsByWorktree =
+          detachedPtyId && !targetHasPrimary
+            ? withTerminalTabPtyId(sourceTabsByWorktree, targetTabId, detachedPtyId)
+            : sourceTabsByWorktree
         return {
           ptyIdsByTabId: nextPtyIdsByTabId,
           lastKnownRelayPtyIdByTabId: nextLastKnownRelayPtyIdByTabId,

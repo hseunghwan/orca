@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TerminalTabIntoPaneState } from './terminal-tab-into-pane-eligibility'
+import type {
+  TerminalJoinSource,
+  TerminalTabIntoPaneState
+} from './terminal-tab-into-pane-eligibility'
 import {
   isSourceWideRefusal,
   resolveTerminalTabIntoPaneEligibility
@@ -13,10 +16,13 @@ import {
   A,
   B,
   C,
+  D,
   intoPaneState,
   P_A,
+  P_D,
   SOURCE,
   sourceLayout,
+  splitSourceLayout,
   targetLayout,
   TARGET,
   terminalTab,
@@ -34,7 +40,11 @@ beforeEach(() => {
   layoutOwner.isMain = false
 })
 
-const args = { sourceTabId: SOURCE, targetTabId: TARGET, isWebClient: false }
+const args: { source: TerminalJoinSource; targetTabId: string; isWebClient: boolean } = {
+  source: { kind: 'tab', tabId: SOURCE },
+  targetTabId: TARGET,
+  isWebClient: false
+}
 
 function refusal(
   state: TerminalTabIntoPaneState,
@@ -55,7 +65,8 @@ describe('resolveTerminalTabIntoPaneEligibility (spec 4.3)', () => {
       leafId: A,
       ptyId: P_A,
       targetLeafId: C,
-      viaHost: false
+      viaHost: false,
+      sourceKeepsPanes: false
     })
   })
 
@@ -78,7 +89,9 @@ describe('resolveTerminalTabIntoPaneEligibility (spec 4.3)', () => {
 
   it('refuses the same tab, a missing tab and another worktree', () => {
     expect(refusal(intoPaneState(), { targetTabId: SOURCE })).toBe('same_tab')
-    expect(refusal(intoPaneState(), { sourceTabId: 'gone' })).toBe('source_missing')
+    expect(refusal(intoPaneState(), { source: { kind: 'tab', tabId: 'gone' } })).toBe(
+      'source_missing'
+    )
     expect(refusal(intoPaneState(), { targetTabId: 'gone' })).toBe('target_missing')
     const other = intoPaneState({
       tabsByWorktree: {
@@ -295,6 +308,45 @@ describe('resolveTerminalTabIntoPaneEligibility (spec 4.3)', () => {
 
   it('does not refuse for unknown liveness: a PTY with no exit evidence stays eligible', () => {
     expect(refusal(intoPaneState({ pendingPtyShutdownIds: { [C]: 1 } }))).toBe('eligible')
+  })
+})
+
+describe('one pane of a split tab', () => {
+  const split = () =>
+    intoPaneState({
+      terminalLayoutsByTabId: { [SOURCE]: splitSourceLayout(), [TARGET]: targetLayout() }
+    })
+  const pane = (leafId: string): TerminalJoinSource => ({ kind: 'pane', tabId: SOURCE, leafId })
+
+  it('joins with its own PTY, and the source keeps its other pane', () => {
+    expect(resolveTerminalTabIntoPaneEligibility(split(), { ...args, source: pane(D) })).toEqual({
+      ok: true,
+      worktreeId: WT,
+      leafId: D,
+      ptyId: P_D,
+      targetLeafId: C,
+      viaHost: false,
+      sourceKeepsPanes: true
+    })
+  })
+
+  it('never borrows the tab row PTY, which names another of its panes', () => {
+    const layout = { ...splitSourceLayout(), ptyIdsByLeafId: { [A]: P_A } }
+    const state = intoPaneState({
+      terminalLayoutsByTabId: { [SOURCE]: layout, [TARGET]: targetLayout() }
+    })
+    expect(refusal(state, { source: pane(D) })).toBe('no_terminal')
+  })
+
+  it('refuses a pane its tab does not hold, and the whole split tab still', () => {
+    expect(refusal(split(), { source: pane(B) })).toBe('source_pane_missing')
+    expect(refusal(split())).toBe('source_not_single_pane')
+  })
+
+  it('is the whole tab when the tab holds only that pane', () => {
+    expect(
+      resolveTerminalTabIntoPaneEligibility(intoPaneState(), { ...args, source: pane(A) })
+    ).toMatchObject({ ok: true, leafId: A, ptyId: P_A, sourceKeepsPanes: false })
   })
 })
 

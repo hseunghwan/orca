@@ -1,12 +1,19 @@
 import type { AppState } from '@/store'
-import type { SetTerminalPaneTitleDetail, SplitTerminalPaneDetail } from '@/constants/terminal'
+import type {
+  CloseTerminalPaneDetail,
+  SetTerminalPaneTitleDetail,
+  SplitTerminalPaneDetail
+} from '@/constants/terminal'
 import type {
   TerminalLeafIntoTabRequest,
   TerminalLeafIntoTabResult
 } from '../../../../shared/workspace-layout/terminal-leaf-move'
 import type { TerminalLayoutSnapshot } from '../../../../shared/workspace-layout/terminal-tab-types'
 import type { PaneSide } from '../../../../shared/workspace-layout/terminal-pane-tree'
-import type { TerminalTabIntoPaneState } from './terminal-tab-into-pane-eligibility'
+import type {
+  TerminalJoinSource,
+  TerminalTabIntoPaneState
+} from './terminal-tab-into-pane-eligibility'
 
 export type TerminalTabIntoPaneStore = TerminalTabIntoPaneState &
   Pick<
@@ -17,6 +24,7 @@ export type TerminalTabIntoPaneStore = TerminalTabIntoPaneState &
     | 'setActiveTab'
     | 'setActiveTabType'
     | 'setTabLayout'
+    | 'syncPaneDetachPtyOwnership'
     | 'syncPaneMoveIntoTabPtyOwnership'
     | 'updateTabPtyId'
   >
@@ -27,6 +35,8 @@ export type TerminalTabIntoPaneDeps = {
   /** Leaf ids of T's mounted panes; null when no TerminalPane is mounted for the tab. */
   mountedLeafIds: (tabId: string) => string[] | null
   dispatchSplit: (detail: SplitTerminalPaneDetail) => void
+  /** Asks the mounted source pane to let go of its PTY without killing it. */
+  dispatchClosePane: (detail: CloseTerminalPaneDetail) => void
   dispatchToggleExpand: (tabId: string) => void
   dispatchPaneTitle: (detail: SetTerminalPaneTitleDetail) => void
   scheduleGraphSync: () => void
@@ -38,14 +48,15 @@ export type TerminalTabIntoPaneDeps = {
   moveLeafIntoTab: (request: TerminalLeafIntoTabRequest) => Promise<TerminalLeafIntoTabResult>
   /** Joins host-owned tabs on their paired host, whose window commits and applies the join. */
   moveTabIntoPaneOnHost: (
-    request: TerminalLeafIntoTabRequest
+    request: TerminalLeafIntoTabRequest,
+    source: TerminalJoinSource
   ) => Promise<TerminalTabIntoPaneOutcome>
   /** Whether the paired host of host-owned tabs joins them, as last probed. */
   hostJoinsTabs: (worktreeId: string) => boolean
 }
 
 export type TerminalTabIntoPaneArgs = {
-  sourceTabId: string
+  source: TerminalJoinSource
   targetTabId: string
   /** Defaults to the target tab's active leaf. */
   targetLeafId?: string | null

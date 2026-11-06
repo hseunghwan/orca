@@ -46,7 +46,8 @@ export function createJoinHarness(store: Store, overrides: Partial<TerminalTabIn
   const titleEvents: SetTerminalPaneTitleDetail[] = []
   let answer: () => Promise<TerminalLeafIntoTabResult> = () =>
     Promise.resolve({ status: 'moved', ptyId: P_A, sourceTabClosed: true })
-  const mounted = [B, C]
+  // Leaves of each mounted TerminalPane; S is not mounted unless a test mounts it.
+  const mountedByTab: Record<string, string[]> = { [TARGET]: [B, C] }
   const remount = vi.fn(() => ({ remounted: true as const, generation: 1 }))
   const traced =
     <Args extends unknown[]>(name: string, fn: (...args: Args) => void) =>
@@ -64,6 +65,10 @@ export function createJoinHarness(store: Store, overrides: Partial<TerminalTabIn
           calls.push('sync')
           s.syncPaneMoveIntoTabPtyOwnership(args)
         },
+        syncPaneDetachPtyOwnership: (args) => {
+          calls.push('detachSync')
+          s.syncPaneDetachPtyOwnership(args)
+        },
         closeTab: traced('closeTab', s.closeTab),
         setActiveTab: traced('setActiveTab', s.setActiveTab),
         remountTerminalTabForRecovery: (tabId) => {
@@ -72,13 +77,21 @@ export function createJoinHarness(store: Store, overrides: Partial<TerminalTabIn
         }
       }
     },
-    mountedLeafIds: () => [...mounted],
+    mountedLeafIds: (tabId) => (mountedByTab[tabId] ? [...mountedByTab[tabId]] : null),
     // A working handler mounts the new pane right away.
     dispatchSplit: (detail) => {
       calls.push('split')
       splits.push(detail)
       expandedAtSplit.push(Boolean(store.getState().expandedPaneByTabId[detail.tabId]))
-      mounted.push(detail.newLeafId ?? '')
+      mountedByTab[detail.tabId]?.push(detail.newLeafId ?? '')
+    },
+    // A mounted pane lets go of its leaf; the layout it would save is left to the caller.
+    dispatchClosePane: (detail) => {
+      calls.push(`closePane:${detail.tabId}:${String(detail.preservePty)}`)
+      const leaves = mountedByTab[detail.tabId]
+      if (leaves && detail.leafId) {
+        mountedByTab[detail.tabId] = leaves.filter((leafId) => leafId !== detail.leafId)
+      }
     },
     // The mounted pane collapses itself, which clears the tab's expanded flag.
     dispatchToggleExpand: (tabId) => {
@@ -109,6 +122,7 @@ export function createJoinHarness(store: Store, overrides: Partial<TerminalTabIn
     titleEvents,
     requests,
     remount,
+    mountedByTab,
     answerWith: (next: () => Promise<TerminalLeafIntoTabResult>) => {
       answer = next
     }

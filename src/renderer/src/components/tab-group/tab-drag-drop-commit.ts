@@ -14,7 +14,7 @@ import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switc
 import { dropTabThroughLayoutOwner } from './tab-group-layout-owner-commands'
 import {
   isSameJoinTarget,
-  resolveTabDragJoinEligibility,
+  resolveDragJoinEligibility,
   resolveTabDragLeafTarget,
   type LeafRect,
   type LeafJoinTarget
@@ -50,7 +50,7 @@ function commitLeafEdgeDrop({
     return
   }
   void leafJoin.moveTabIntoPane({
-    sourceTabId: activeData.visibleTabId,
+    source: { kind: 'tab', tabId: activeData.visibleTabId },
     targetTabId: leafTarget.targetTabId,
     targetLeafId: leafTarget.leafId,
     side: leafTarget.side
@@ -157,8 +157,8 @@ export function commitTabDragDrop({
   if (
     !leafTarget &&
     shownLeafTarget &&
-    !resolveTabDragJoinEligibility(state, {
-      sourceTabId: activeData.visibleTabId,
+    !resolveDragJoinEligibility(state, {
+      source: { kind: 'tab', tabId: activeData.visibleTabId },
       targetTabId: shownLeafTarget.targetTabId,
       targetLeafId: shownLeafTarget.leafId
     }).ok

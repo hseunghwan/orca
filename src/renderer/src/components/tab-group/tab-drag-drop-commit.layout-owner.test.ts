@@ -123,7 +123,7 @@ describe('commitTabDragDrop on a pane edge in a layout-owner build', () => {
     h.commit(dragEndEventAt(PANE_EDGE, { overGroupId: GROUP }))
 
     expect(h.moveTabIntoPane).toHaveBeenCalledWith({
-      sourceTabId: SOURCE,
+      source: { kind: 'tab', tabId: SOURCE },
       targetTabId: TARGET,
       targetLeafId: C,
       side: 'right'

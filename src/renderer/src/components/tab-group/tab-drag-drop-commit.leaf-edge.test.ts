@@ -141,7 +141,7 @@ describe('commitTabDragDrop: a drop on the edge of a pane inside another tab', (
 
     expect(h.moveTabIntoPane).toHaveBeenCalledTimes(1)
     expect(h.moveTabIntoPane).toHaveBeenCalledWith({
-      sourceTabId: SOURCE,
+      source: { kind: 'tab', tabId: SOURCE },
       targetTabId: TARGET,
       targetLeafId: leafId,
       side

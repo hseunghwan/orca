@@ -19,7 +19,7 @@ vi.mock('@/components/terminal-pane/pty-dispatcher', () => ({
 const mockApi = createStoreCascadesMockApi()
 Object.assign(mockApi, { session: { closeTerminalSurface: vi.fn().mockResolvedValue(undefined) } })
 
-const join = { sourceTabId: SOURCE, targetTabId: TARGET, side: 'right' } as const
+const join = { source: { kind: 'tab', tabId: SOURCE }, targetTabId: TARGET, side: 'right' } as const
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -225,7 +225,8 @@ describe('moveTerminalTabIntoPane results', () => {
           leafId: A,
           targetLeafId: C,
           placement: { kind: 'beside', side: 'right' }
-        })
+        }),
+        join.source
       )
       expect(h.requests).toEqual([])
       expect(h.calls).toEqual([])
