@@ -1,4 +1,4 @@
-/** Shared steps of the "join a single-pane tab into another tab" journeys (the tab menu). */
+/** Shared steps of the "join a single-pane tab into another tab" journeys (tab drag). */
 
 import { existsSync, readFileSync } from 'node:fs'
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
@@ -9,7 +9,6 @@ import { createTerminalTabFromMenu, SORTABLE_TAB } from './terminal-tab-menu'
 import { waitForActivePanePtyId, waitForActiveTerminalManager } from './terminal'
 import { readLeafPane, readLeafShellPid } from './terminal-leaf-pane-probes'
 import { TEST_REPO_PATH_FILE } from '../global-setup'
-import { resolveTerminalTabTitle } from '../../../src/shared/tab-title-resolution'
 
 export type TabJoinSetup = {
   targetTabId: string
@@ -59,20 +58,6 @@ async function waitForMainToHold(page: Page, tabIds: string[]): Promise<void> {
       { timeout: 30_000, message: 'Main never recorded both tab layouts' }
     )
     .toBe(true)
-}
-
-/** The tab's name as the Move Into Tab menu lists it. */
-export async function tabTitle(page: Page, tabId: string): Promise<string> {
-  const { tab, generatedTitlesEnabled } = await page.evaluate((tabId) => {
-    const state = window.__store?.getState()
-    return {
-      tab: Object.values(state?.tabsByWorktree ?? {})
-        .flat()
-        .find((candidate) => candidate.id === tabId),
-      generatedTitlesEnabled: state?.settings?.tabAutoGenerateTitle === true
-    }
-  }, tabId)
-  return tab ? resolveTerminalTabTitle(tab, generatedTitlesEnabled, tab.title) : ''
 }
 
 /** A target tab T (the first terminal) and a source tab S (a new terminal), each with one bound pane. */

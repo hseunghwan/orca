@@ -297,7 +297,7 @@ describe('in a layout-owner build', () => {
     expect(refusal(intoPaneState({ tabsByWorktree: {} }))).toBe('layout_owner_build')
   })
 
-  it('is a source-wide refusal, so the menu shows one reason for every target', () => {
+  it('is a source-wide refusal, so it repeats on every target', () => {
     expect(isSourceWideRefusal('layout_owner_build')).toBe(true)
   })
 })

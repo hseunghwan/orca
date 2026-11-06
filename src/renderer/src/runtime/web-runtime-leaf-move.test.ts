@@ -71,7 +71,7 @@ describe('moveWebRuntimeTabIntoPane', () => {
       acceptCurrentSnapshot: true
     })
   })
-  it('a headless or older host leaves both tabs, and the menu offers the join only to a host that joins', async () => {
+  it('a headless or older host leaves both tabs, and only a host that joins is offered the join', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const call = vi.fn().mockResolvedValue({ id: 'm', ok: true, result: { status: 'not_held' } })
     stubRuntimeEnvironmentBridge({ call })

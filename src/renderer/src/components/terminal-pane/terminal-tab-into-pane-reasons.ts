@@ -1,7 +1,7 @@
 import { translate } from '@/i18n/i18n'
 import type { TerminalTabIntoPaneRefusal } from './terminal-tab-into-pane-eligibility'
 
-/** Why a tab cannot join a pane right now, in the words a disabled menu entry shows. */
+/** Why a tab cannot join a pane right now, in the words a refused drop target shows. */
 export function describeTerminalTabIntoPaneRefusal(reason: TerminalTabIntoPaneRefusal): string {
   switch (reason) {
     case 'source_not_single_pane':

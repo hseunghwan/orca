@@ -1,6 +1,9 @@
 import type { AppState } from '@/store'
 import { makePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
-import type { TerminalLayoutSnapshot, TerminalTab } from '../../../../shared/workspace-layout/terminal-tab-types'
+import type {
+  TerminalLayoutSnapshot,
+  TerminalTab
+} from '../../../../shared/workspace-layout/terminal-tab-types'
 import { collectLayoutLeafIdsInOrder } from '../../../../shared/workspace-layout/terminal-pane-tree'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
 import { isWebClientLocation } from '@/lib/web-client-location'
@@ -97,7 +100,7 @@ function layoutLeaves(layout: TerminalLayoutSnapshot | undefined): {
 
 /**
  * Whether the single-pane tab `sourceTabId` may join `targetTabId`'s pane. Pure over the store, so
- * the menu can disable an entry with its reason and the move can recheck at the moment it runs.
+ * a drop target can show its refusal reason and the move can recheck at the moment it runs.
  * Main re-checks what it can see; the checks here are the renderer-only ones it cannot.
  */
 export function resolveTerminalTabIntoPaneEligibility(

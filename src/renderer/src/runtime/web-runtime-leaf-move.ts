@@ -44,7 +44,7 @@ export async function resolvePaneMoveHost(
   return supported ? environmentId : null
 }
 
-/** Whether this worktree's host joins a tab into a pane, as last probed; a menu cannot wait for a probe. */
+/** Whether this worktree's host joins a tab into a pane, as last probed; a drag cannot wait for a probe. */
 export function hostJoinsTabsIntoPanes(worktreeId: string): boolean {
   const environmentId = pairedHostOf(worktreeId, 'join a tab into a pane on its host')
   return (

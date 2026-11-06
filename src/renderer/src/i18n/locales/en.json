@@ -22092,10 +22092,6 @@
     "paneMove": {
       "failed": "Couldn't move the pane to a new tab.",
       "intoTabFailed": "Couldn't move the pane into that tab.",
-      "moveIntoTab": "Move Into Tab",
-      "splitRight": "Split Right",
-      "splitDown": "Split Down",
-      "noTargets": "No other terminal tabs",
       "reason": {
         "sourceNotSinglePane": "Tab has several panes",
         "chat": "Chat view",
