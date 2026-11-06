@@ -4466,6 +4466,9 @@
           "TabGroupDropOverlay": {
             "paneColumnLabel": "New split"
           },
+          "TabLeafDropOverlay": {
+            "joinLabel": "Join as split"
+          },
           "useTabGroupCreationCommands": {
             "duplicateBrowserTabFailed": "The paired runtime could not duplicate the managed browser tab."
           }

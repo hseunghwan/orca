@@ -3691,6 +3691,9 @@
           "TabGroupDropOverlay": {
             "paneColumnLabel": "새 분할"
           },
+          "TabLeafDropOverlay": {
+            "joinLabel": "분할로 합치기"
+          },
           "useTabGroupCreationCommands": {
             "duplicateBrowserTabFailed": "페어링된 런타임에서 관리되는 브라우저 탭을 복제하지 못했습니다."
           }

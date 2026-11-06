@@ -224,6 +224,30 @@
   background: color-mix(in srgb, var(--chart-2) 20%, transparent);
 }
 
+/* Orange, not the new-column blue: this drop joins the shown tab instead of opening a column. */
+.tab-join-overlay {
+  background: color-mix(in srgb, var(--agent-question) 20%, transparent);
+  border: 2px solid color-mix(in srgb, var(--agent-question) 50%, transparent);
+  border-radius: 4px;
+}
+
+.tab-join-overlay__label {
+  font-size: 11px;
+  color: var(--agent-question-text);
+  background: color-mix(in srgb, var(--agent-question) 10%, var(--background));
+}
+
+/* A join target that would refuse the drop reads as unavailable, not as a drop zone. */
+.tab-join-overlay[data-disabled] {
+  background: color-mix(in srgb, var(--muted-foreground) 14%, transparent);
+  border: 2px dashed color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+}
+
+.tab-join-overlay[data-disabled] .tab-join-overlay__label {
+  color: var(--foreground);
+  background: var(--background);
+}
+
 :root {
   --orca-pane-title-height: 24px;
   --orca-pane-title-fg: var(--terminal-pane-title-on-dark-fg);

@@ -126,6 +126,16 @@ describe('resolveTerminalTabIntoPaneEligibility (spec 4.3)', () => {
     expect(refusal(chatTargetLeaf)).toBe('target_chat')
   })
 
+  it('reports the source refusal before a chat-view target', () => {
+    const state = intoPaneState({
+      pendingPtyShutdownIds: { [P_A]: 1 },
+      tabsByWorktree: {
+        [WT]: [terminalTab(SOURCE, P_A), terminalTab(TARGET, 'pty-b', { viewMode: 'chat' })]
+      }
+    })
+    expect(refusal(state)).toBe('pty_exiting')
+  })
+
   it('refuses a source with no PTY', () => {
     const state = intoPaneState({
       tabsByWorktree: { [WT]: [terminalTab(SOURCE, null), terminalTab(TARGET, 'pty-b')] },
