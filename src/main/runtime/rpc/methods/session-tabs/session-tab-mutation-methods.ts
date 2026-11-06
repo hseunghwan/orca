@@ -156,6 +156,7 @@ export const SESSION_TAB_MUTATION_METHODS = [
       }
       return runtime.moveMobileSessionTabIntoPane(params.worktree, {
         sourceTabId: params.sourceTabId,
+        ...(params.sourceLeafId ? { sourceLeafId: params.sourceLeafId } : {}),
         targetTabId: params.targetTabId,
         ...(params.targetLeafId ? { targetLeafId: params.targetLeafId } : {}),
         side: params.side

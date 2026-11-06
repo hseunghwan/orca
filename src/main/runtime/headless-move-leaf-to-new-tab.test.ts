@@ -374,6 +374,19 @@ describe('moveMobileSessionLeafToNewTab on a host with a window', () => {
     expect(getSession()).toBe(before)
   })
 
+  it("passes the client's pane on, so the window moves that one pane and not the whole tab", async () => {
+    const moveTabIntoPane = vi.fn(async () => ({ status: 'moved' as const }))
+    const { runtime } = await setupWithWindow(undefined, moveTabIntoPane)
+    const join = {
+      sourceTabId: 'other-tab',
+      sourceLeafId: 'leaf-1',
+      targetTabId: 'host-tab',
+      side: 'left' as const
+    }
+    await runtime.moveMobileSessionTabIntoPane(`id:${TEST_WORKTREE_ID}`, join)
+    expect(moveTabIntoPane).toHaveBeenCalledWith({ worktreeId: TEST_WORKTREE_ID, ...join })
+  })
+
   it('refuses a join the window cannot answer, rather than failing the call', async () => {
     const { runtime } = await setupWithWindow(undefined, () =>
       Promise.reject(new Error('renderer_unavailable'))

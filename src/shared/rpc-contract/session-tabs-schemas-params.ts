@@ -136,6 +136,8 @@ export const MovePaneToNewTab = WorktreeTabSelector.extend({
 })
 export const MoveTabIntoPane = WorktreeTabSelector.extend({
   sourceTabId: MovePaneId,
+  // The pane to move; without it the source tab's only pane joins.
+  sourceLeafId: MovePaneId.optional(),
   targetTabId: MovePaneId,
   // Without it the host joins beside the target's active pane.
   targetLeafId: MovePaneId.optional(),

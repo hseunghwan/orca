@@ -144,7 +144,7 @@ export type RuntimeNotifier = {
   movePaneToNewTab?(
     move: Omit<TerminalPaneMoveToNewTabRequest, 'requestId'>
   ): Promise<TerminalLeafMoveResult>
-  /** The window joins a client's single-pane tab into another tab's pane; rejects when it cannot answer. */
+  /** The window joins a client's tab or pane into another tab's pane; rejects when it cannot answer. */
   moveTabIntoPane?(
     move: Omit<TerminalTabIntoPaneMoveRequest, 'requestId'>
   ): Promise<TerminalTabIntoPaneHostResult>

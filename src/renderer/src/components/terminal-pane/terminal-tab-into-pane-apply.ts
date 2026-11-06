@@ -65,36 +65,41 @@ export function sourceLayoutAfterMove(
 /**
  * Takes the moved pane out of a source tab that keeps other panes: the mounted pane lets go of the
  * PTY without killing it, the source saves its smaller layout and gives up the PTY to the target.
+ * A source whose layout already dropped the leaf (a host snapshot got there first) only lets go.
  */
 export function releaseFromSurvivingSource(
   deps: TerminalTabIntoPaneDeps,
   request: TerminalLeafIntoTabRequest,
-  ptyId: string,
-  remaining: TerminalLayoutSnapshot
+  ptyId: string
 ): void {
   const { sourceTabId, targetTabId, leafId } = request
+  // Read before the release: the mounted pane's own save drops the leaf from the store.
+  const remaining = sourceLayoutAfterMove(deps, request)
   deps.dispatchClosePane({
     tabId: sourceTabId,
     leafId,
     preservePty: true,
     lastPaneCloseReason: 'cleanup'
   })
-  // The mounted pane saves its own smaller layout; a source that is not mounted needs it written.
-  if (
+  const holdsLeaf = (): boolean =>
     layoutContainsLeafId(deps.getStore().terminalLayoutsByTabId[sourceTabId]?.root ?? null, leafId)
-  ) {
+  // The mounted pane saves its own smaller layout; a source that is not mounted needs it written.
+  if (remaining && holdsLeaf()) {
     deps.getStore().setTabLayout(sourceTabId, remaining)
   }
   if (deps.mountedLeafIds(sourceTabId)?.includes(leafId)) {
     deps.getStore().remountTerminalTabForRecovery(sourceTabId)
   }
-  deps.getStore().syncPaneDetachPtyOwnership({
-    detachedLeafId: leafId,
-    detachedPtyId: ptyId,
-    sourceLayout: deps.getStore().terminalLayoutsByTabId[sourceTabId] ?? remaining,
-    sourceTabId,
-    targetTabId
-  })
+  const sourceLayout = deps.getStore().terminalLayoutsByTabId[sourceTabId]
+  if (sourceLayout) {
+    deps.getStore().syncPaneDetachPtyOwnership({
+      detachedLeafId: leafId,
+      detachedPtyId: ptyId,
+      sourceLayout,
+      sourceTabId,
+      targetTabId
+    })
+  }
 }
 
 /**
@@ -130,7 +135,7 @@ export function applyTerminalTabJoin(
   })
   // S's pane detaches before T's adopts it: a detach drops every listener on the PTY.
   if (remaining) {
-    releaseFromSurvivingSource(deps, request, ptyId, remaining)
+    releaseFromSurvivingSource(deps, request, ptyId)
   }
   const mounted = deps.mountedLeafIds(targetTabId)
   if (mounted) {

@@ -16,6 +16,7 @@ import {
   readCachedRuntimeEnvironmentCapability,
   runtimeEnvironmentSupportsCapability
 } from './runtime-rpc-client'
+import type { TerminalJoinSource } from '../components/terminal-pane/terminal-tab-into-pane-eligibility'
 import { unwrapRuntimeRpcResult } from './runtime-rpc-result'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
 import {
@@ -105,11 +106,12 @@ export async function moveWebRuntimeLeafToNewTab(
 }
 
 /**
- * Asks the host to join a single-pane tab into another tab's pane; its window commits and applies
- * the join, and this window redraws from the host's tabs. An older or headless host refuses.
+ * Asks the host to join a tab, or one pane of a tab, into another tab's pane; its window commits and
+ * applies the join, and this window redraws from the host's tabs. An older or headless host refuses.
  */
 export async function moveWebRuntimeTabIntoPane(
-  request: TerminalLeafIntoTabRequest
+  request: TerminalLeafIntoTabRequest,
+  source: TerminalJoinSource
 ): Promise<HostPaneMoveOutcome> {
   const environmentId = await resolvePaneMoveHost(
     request.worktreeId,
@@ -125,6 +127,8 @@ export async function moveWebRuntimeTabIntoPane(
       params: {
         worktree: toRuntimeWorktreeSelector(request.worktreeId),
         sourceTabId: toHostSessionTabId(request.sourceTabId),
+        // A whole tab names no pane, so the host keeps checking that it holds just one.
+        ...(source.kind === 'pane' ? { sourceLeafId: request.leafId } : {}),
         targetTabId: toHostSessionTabId(request.targetTabId),
         targetLeafId: request.targetLeafId,
         side: request.placement.side

@@ -20,7 +20,10 @@ import {
 } from '@/components/tab-group/tab-group-layout-owner-commands'
 import { resolveBrowserSessionTabTarget } from './browser-session-tab-target'
 import { resolveWindowTabIdForHostTab } from './host-session-tab-target'
-import { moveTerminalPaneToNewTabForClient } from '@/components/terminal-pane/terminal-pane-move-request-routing'
+import {
+  moveTerminalPaneIntoTabForClient,
+  moveTerminalPaneToNewTabForClient
+} from '@/components/terminal-pane/terminal-pane-move-request-routing'
 import { moveTerminalTabIntoPaneInApp } from '@/components/terminal-pane/terminal-tab-into-pane-deps'
 
 export function registerSessionTabIpcBridge(unsubs: (() => void)[]): void {
@@ -168,15 +171,22 @@ function registerTerminalPaneMoveRequests(unsubs: (() => void)[]): void {
     return
   }
   unsubs.push(
-    onTerminalTabIntoPaneRequest(({ requestId, worktreeId, sourceTabId, targetTabId, ...join }) => {
-      void moveTerminalTabIntoPaneInApp({
-        ...join,
-        source: { kind: 'tab', tabId: resolveWindowTabIdForHostTab(worktreeId, sourceTabId) },
-        targetTabId: resolveWindowTabIdForHostTab(worktreeId, targetTabId)
-      })
-        .catch(() => 'unknown' as const)
-        .then((status) => replyTerminalTabIntoPane({ requestId, result: { status } }))
-    })
+    onTerminalTabIntoPaneRequest(
+      ({ requestId, worktreeId, sourceTabId, sourceLeafId, targetTabId, ...join }) => {
+        const tabId = resolveWindowTabIdForHostTab(worktreeId, sourceTabId)
+        const args = { ...join, targetTabId: resolveWindowTabIdForHostTab(worktreeId, targetTabId) }
+        const moved = sourceLeafId
+          ? moveTerminalPaneIntoTabForClient({
+              ...args,
+              worktreeId,
+              source: { kind: 'pane', tabId, leafId: sourceLeafId }
+            })
+          : moveTerminalTabIntoPaneInApp({ ...args, source: { kind: 'tab', tabId } })
+        void moved
+          .catch(() => 'unknown' as const)
+          .then((status) => replyTerminalTabIntoPane({ requestId, result: { status } }))
+      }
+    )
   )
 }
 

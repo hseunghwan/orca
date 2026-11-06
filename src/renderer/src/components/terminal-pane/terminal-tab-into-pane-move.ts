@@ -51,9 +51,8 @@ function dropMovedPaneFromSource(
   if (!sourceStillHere || (layout && !layoutContainsLeafId(layout.root, request.leafId))) {
     return
   }
-  const remaining = sourceLayoutAfterMove(deps, request)
-  if (remaining) {
-    releaseFromSurvivingSource(deps, request, ptyId, remaining)
+  if (sourceLayoutAfterMove(deps, request)) {
+    releaseFromSurvivingSource(deps, request, ptyId)
   } else {
     closeSourceTab(deps, request.sourceTabId)
   }
@@ -108,9 +107,8 @@ function releaseHostMovedPane(
         deps.getStore().terminalLayoutsByTabId[targetTabId]?.root ?? null,
         leafId
       ))
-  const remaining = hostMoved && ptyId ? sourceLayoutAfterMove(deps, request) : null
-  if (remaining && ptyId) {
-    releaseFromSurvivingSource(deps, request, ptyId, remaining)
+  if (hostMoved && ptyId) {
+    releaseFromSurvivingSource(deps, request, ptyId)
   }
 }
 

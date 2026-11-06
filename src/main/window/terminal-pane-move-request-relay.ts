@@ -109,7 +109,7 @@ export function requestTerminalPaneMoveFromRenderer(
   })
 }
 
-/** Asks the window to join a single-pane tab into another tab's pane; rejects when it cannot answer. */
+/** Asks the window to join a tab or one of its panes into another tab's pane; rejects when it cannot answer. */
 export function requestTerminalTabIntoPaneFromRenderer(
   mainWindow: BrowserWindow,
   move: Omit<TerminalTabIntoPaneMoveRequest, 'requestId'>

@@ -20,6 +20,7 @@ vi.mock('./runtime-rpc-client', () => ({
 vi.mock('./web-runtime-session-snapshot', () => ({
   refreshWebRuntimeSessionTabsSnapshot: refresh
 }))
+const WHOLE_TAB = { kind: 'tab', tabId: toWebTerminalSurfaceTabId('host-source') } as const
 const REQUEST = {
   worktreeId: WORKTREE_ID,
   sourceTabId: toWebTerminalSurfaceTabId('host-source'),
@@ -55,7 +56,7 @@ describe('moveWebRuntimeTabIntoPane', () => {
       targetLeafId: '22222222-2222-4222-8222-222222222222',
       placement: { kind: 'beside' as const, side: 'bottom' as const }
     }
-    await expect(moveWebRuntimeTabIntoPane(join)).resolves.toBe('moved')
+    await expect(moveWebRuntimeTabIntoPane(join, WHOLE_TAB)).resolves.toBe('moved')
     expect(supports).toHaveBeenCalledWith(ENVIRONMENT_ID, 'session-tabs.move-tab-into-pane.v1')
     expect(call.mock.calls[0][0]).toMatchObject({
       method: 'session.tabs.moveTabIntoPane',
@@ -67,8 +68,28 @@ describe('moveWebRuntimeTabIntoPane', () => {
         side: 'bottom'
       }
     })
+    expect(call.mock.calls[0][0].params).not.toHaveProperty('sourceLeafId')
     expect(refresh).toHaveBeenCalledWith(ENVIRONMENT_ID, WORKTREE_ID, {
       acceptCurrentSnapshot: true
+    })
+  })
+  it('names the dragged pane, so the host moves only it and keeps its tab', async () => {
+    const call = vi.fn().mockResolvedValue({ id: 'm', ok: true, result: { status: 'moved' } })
+    stubRuntimeEnvironmentBridge({ call })
+    supports.mockResolvedValue(true)
+    const join = {
+      ...REQUEST,
+      keepsSourcePane: true as const,
+      targetLeafId: '22222222-2222-4222-8222-222222222222',
+      placement: { kind: 'beside' as const, side: 'left' as const }
+    }
+    const pane = { kind: 'pane', tabId: REQUEST.sourceTabId, leafId: REQUEST.leafId } as const
+    await expect(moveWebRuntimeTabIntoPane(join, pane)).resolves.toBe('moved')
+    expect(call.mock.calls[0][0].params).toMatchObject({
+      sourceTabId: 'host-source',
+      sourceLeafId: REQUEST.leafId,
+      targetTabId: 'host-target',
+      side: 'left'
     })
   })
   it('a headless or older host leaves both tabs, and only a host that joins is offered the join', async () => {
@@ -81,10 +102,10 @@ describe('moveWebRuntimeTabIntoPane', () => {
       targetLeafId: 'leaf-b',
       placement: { kind: 'beside' as const, side: 'right' as const }
     }
-    await expect(moveWebRuntimeTabIntoPane(join)).resolves.toBe('refused')
+    await expect(moveWebRuntimeTabIntoPane(join, WHOLE_TAB)).resolves.toBe('refused')
     expect(refresh).not.toHaveBeenCalled()
     supports.mockResolvedValue(false)
-    await expect(moveWebRuntimeTabIntoPane(join)).resolves.toBe('refused')
+    await expect(moveWebRuntimeTabIntoPane(join, WHOLE_TAB)).resolves.toBe('refused')
     expect(call).toHaveBeenCalledTimes(1)
     cachedCapability.mockReturnValue(true)
     expect(hostJoinsTabsIntoPanes(WORKTREE_ID)).toBe(true)

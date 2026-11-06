@@ -144,34 +144,100 @@ describe('moving one pane of a split tab into another tab', () => {
     expect(h.store.getState().terminalLayoutsByTabId[SOURCE]).toMatchObject(remainingSource)
   })
 
-  it('on a paired host, lets go of the mirrored pane once the host moved it', async () => {
-    const moveTabIntoPaneOnHost = vi.fn(() => Promise.resolve('moved' as const))
-    const h = splitSourceHarness({ hostJoinsTabs: () => true, moveTabIntoPaneOnHost })
-    h.store.setState((s) => ({
-      terminalLayoutsByTabId: Object.fromEntries(
-        Object.entries(s.terminalLayoutsByTabId).map(([tabId, layout]) => [
-          tabId,
-          {
-            ...layout,
-            ptyIdsByLeafId: Object.fromEntries(
-              Object.entries(layout.ptyIdsByLeafId ?? {}).map(([leafId, ptyId]) => [
-                leafId,
-                `remote:env-1@@${ptyId}`
-              ])
-            )
+  describe('on a paired host', () => {
+    /** Both tabs host-owned; the host answers `outcome`, after its snapshot drew `snapshot` here. */
+    function pairedHarness(
+      outcome: 'moved' | 'unknown',
+      snapshot: { sourceLeft: boolean; targetHolds: boolean }
+    ) {
+      const remote = (ptyId: string) => `remote:env-1@@${ptyId}`
+      const moveTabIntoPaneOnHost = vi.fn(() => {
+        h.store.setState((s) => ({
+          terminalLayoutsByTabId: {
+            ...s.terminalLayoutsByTabId,
+            ...(snapshot.sourceLeft
+              ? { [SOURCE]: { ...remainingSource, ptyIdsByLeafId: { [D]: remote(P_D) } } }
+              : {}),
+            ...(snapshot.targetHolds
+              ? {
+                  [TARGET]: {
+                    ...s.terminalLayoutsByTabId[TARGET]!,
+                    root: {
+                      type: 'split' as const,
+                      direction: 'vertical' as const,
+                      first: s.terminalLayoutsByTabId[TARGET]!.root!,
+                      second: { type: 'leaf' as const, leafId: A }
+                    }
+                  }
+                }
+              : {})
           }
-        ])
+        }))
+        return Promise.resolve(outcome)
+      })
+      const h = splitSourceHarness({ hostJoinsTabs: () => true, moveTabIntoPaneOnHost })
+      h.store.setState((s) => ({
+        ptyIdsByTabId: { ...s.ptyIdsByTabId, [SOURCE]: [remote(P_A), remote(P_D)] },
+        terminalLayoutsByTabId: Object.fromEntries(
+          Object.entries(s.terminalLayoutsByTabId).map(([tabId, layout]) => [
+            tabId,
+            {
+              ...layout,
+              ptyIdsByLeafId: Object.fromEntries(
+                Object.entries(layout.ptyIdsByLeafId ?? {}).map(([leafId, ptyId]) => [
+                  leafId,
+                  remote(ptyId)
+                ])
+              )
+            }
+          ])
+        )
+      }))
+      return { h, moveTabIntoPaneOnHost }
+    }
+
+    it('names the pane to the host and does not ask its own main', async () => {
+      const { h, moveTabIntoPaneOnHost } = pairedHarness('moved', {
+        sourceLeft: false,
+        targetHolds: false
+      })
+
+      await expect(moveTerminalTabIntoPane(paneJoin, h.deps)).resolves.toBe('moved')
+
+      expect(moveTabIntoPaneOnHost).toHaveBeenCalledWith(
+        expect.objectContaining({ leafId: A, keepsSourcePane: true }),
+        paneJoin.source
       )
-    }))
+      expect(h.requests).toEqual([])
+    })
 
-    await expect(moveTerminalTabIntoPane(paneJoin, h.deps)).resolves.toBe('moved')
+    it.each([
+      ['moved, its layout already redrawn without the pane', 'moved', true, true],
+      ['moved, before its layout arrives', 'moved', false, false],
+      ['answer lost, but its target already holds the pane', 'unknown', false, true]
+    ] as const)(
+      'lets go of the mirrored pane when the host %s',
+      async (_case, outcome, sourceLeft, targetHolds) => {
+        const { h } = pairedHarness(outcome, { sourceLeft, targetHolds })
 
-    expect(moveTabIntoPaneOnHost).toHaveBeenCalledWith(
-      expect.objectContaining({ leafId: A, keepsSourcePane: true }),
-      paneJoin.source
+        await moveTerminalTabIntoPane(paneJoin, h.deps)
+
+        expect(h.mountedByTab[SOURCE]).toEqual([D])
+        expect(h.store.getState().ptyIdsByTabId[SOURCE]).toEqual(['remote:env-1@@pty-d'])
+        expect(h.store.getState().tabsByWorktree[WT]?.map((tab) => tab.id)).toEqual([
+          SOURCE,
+          TARGET
+        ])
+      }
     )
-    expect(h.requests).toEqual([])
-    expect(h.mountedByTab[SOURCE]).toEqual([D])
-    expect(h.store.getState().tabsByWorktree[WT]?.map((tab) => tab.id)).toEqual([SOURCE, TARGET])
+
+    it('keeps the pane when the answer was lost and the host still shows it in its tab', async () => {
+      const { h } = pairedHarness('unknown', { sourceLeft: false, targetHolds: false })
+
+      await expect(moveTerminalTabIntoPane(paneJoin, h.deps)).resolves.toBe('unknown')
+
+      expect(h.mountedByTab[SOURCE]).toEqual([A, D])
+      expect(h.calls).toEqual([])
+    })
   })
 })

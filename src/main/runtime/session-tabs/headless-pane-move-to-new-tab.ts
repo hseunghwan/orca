@@ -86,11 +86,17 @@ export abstract class OrcaRuntimeWithHeadlessPaneMoveToNewTab extends OrcaRuntim
     return result
   }
 
-  // Why: joining a client's tab into a pane closes a tab and regrafts another, which only a window
-  // that owns the layout can apply; a headless host answers not_held and the client keeps both tabs.
+  // Why: joining a client's tab or pane into a pane regrafts layouts and may close a tab, which only
+  // a window that owns the layout can apply; a headless host answers not_held and nothing moves.
   async moveMobileSessionTabIntoPane(
     worktreeSelector: string,
-    args: { sourceTabId: string; targetTabId: string; targetLeafId?: string; side: PaneSide }
+    args: {
+      sourceTabId: string
+      sourceLeafId?: string
+      targetTabId: string
+      targetLeafId?: string
+      side: PaneSide
+    }
   ): Promise<TerminalTabIntoPaneHostResult> {
     if (!this.getAvailableAuthoritativeWindow() || !this.notifier?.moveTabIntoPane) {
       return { status: 'not_held' }
