@@ -1,6 +1,9 @@
 import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TerminalLeafMoveResult } from '../../shared/workspace-layout/terminal-leaf-move'
+import type {
+  TerminalLeafIntoTabResult,
+  TerminalLeafMoveResult
+} from '../../shared/workspace-layout/terminal-leaf-move'
 
 const ipcEmitter = new EventEmitter()
 const ipcMainMock = {
@@ -139,5 +142,93 @@ describe('requestTerminalPaneMoveFromRenderer', () => {
       first.relay.commitRelayedPaneMove(first.sender, move.targetTabId, commit)
     ).resolves.toEqual({ status: 'refused', reason: 'pane_unavailable' })
     expect(commit).not.toHaveBeenCalled()
+  })
+})
+
+const join = {
+  worktreeId: 'wt-1',
+  sourceTabId: 'tab-1',
+  sourceLeafId: 'leaf-1',
+  targetTabId: 'tab-2',
+  targetLeafId: 'leaf-2',
+  side: 'right' as const
+}
+
+async function requestJoin() {
+  const relay = {
+    ...(await import('./terminal-pane-move-request-relay')),
+    ...(await import('./terminal-pane-move-commit-fence'))
+  }
+  const { mainWindow, webContents } = createMainWindow()
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the EventEmitter double implements the BrowserWindow members the relay uses.
+  const pending = relay.requestTerminalTabIntoPaneFromRenderer(mainWindow as never, join)
+  const request = webContents.send.mock.calls[0]![1]
+  const reply = (status: 'moved' | 'refused'): void => {
+    ipcEmitter.emit(
+      'ui:terminalTabIntoPaneReply',
+      { sender: webContents },
+      { requestId: request.requestId, result: { status } }
+    )
+  }
+  const key = relay.relayedPaneJoinKey(join)
+  return { relay, pending, sender: webContents, webContents, reply, key }
+}
+
+describe('requestTerminalTabIntoPaneFromRenderer', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.useFakeTimers()
+    ipcEmitter.removeAllListeners()
+  })
+
+  it('commits no join the window tries after the client was told the join timed out', async () => {
+    const { relay, pending, sender, reply, key } = await requestJoin()
+    const timedOut = expect(pending).rejects.toThrow('terminal_pane_move_timeout')
+    await vi.advanceTimersByTimeAsync(10_000)
+    await timedOut
+
+    const commit = vi.fn(async (): Promise<TerminalLeafIntoTabResult> => ({
+      status: 'moved',
+      ptyId: 'pty-1',
+      sourceTabClosed: false
+    }))
+    await expect(relay.commitRelayedPaneJoin(sender, key, commit)).resolves.toEqual({
+      status: 'refused',
+      reason: 'relay_timed_out'
+    })
+    expect(commit).not.toHaveBeenCalled()
+    reply('refused')
+    expect(ipcEmitter.listenerCount('ui:terminalTabIntoPaneReply')).toBe(0)
+  })
+
+  it('waits past the deadline for the reply of a join the window is committing', async () => {
+    const { relay, pending, sender, reply, key } = await requestJoin()
+    let finish: (result: TerminalLeafIntoTabResult) => void = () => {}
+    const committing = relay.commitRelayedPaneJoin(
+      sender,
+      key,
+      () => new Promise<TerminalLeafIntoTabResult>((resolve) => (finish = resolve))
+    )
+    await vi.advanceTimersByTimeAsync(10_000)
+    finish({ status: 'moved', ptyId: 'pty-1', sourceTabClosed: false })
+    await committing
+    reply('moved')
+
+    await expect(pending).resolves.toEqual({ status: 'moved' })
+  })
+
+  it('answers moved when the window goes away after its join committed', async () => {
+    const { relay, pending, sender, webContents, key } = await requestJoin()
+    let finish: (result: TerminalLeafIntoTabResult) => void = () => {}
+    const committing = relay.commitRelayedPaneJoin(
+      sender,
+      key,
+      () => new Promise<TerminalLeafIntoTabResult>((resolve) => (finish = resolve))
+    )
+    webContents.emit('render-process-gone')
+    finish({ status: 'moved', ptyId: 'pty-1', sourceTabClosed: true })
+    await committing
+
+    await expect(pending).resolves.toEqual({ status: 'moved' })
   })
 })

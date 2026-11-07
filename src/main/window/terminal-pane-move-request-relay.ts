@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { ipcMain } from 'electron'
 import type { BrowserWindow } from 'electron'
 import type {
+  TerminalLeafIntoTabResult,
   TerminalLeafMoveResult,
   TerminalPaneMoveToNewTabReply,
   TerminalPaneMoveToNewTabRequest,
@@ -12,7 +13,12 @@ import type {
 } from '../../shared/workspace-layout/terminal-leaf-move'
 import { addFanoutListener } from '../runtime/events/event-listener-fanout'
 import { abortWhenRendererGone } from '../ipc/renderer-lifetime-abort'
-import { holdRelayedPaneMove, type RelayedPaneMove } from './terminal-pane-move-commit-fence'
+import {
+  holdRelayedPaneJoin,
+  holdRelayedPaneMove,
+  relayedPaneJoinKey,
+  type RelayedPaneMove
+} from './terminal-pane-move-commit-fence'
 
 // Why: under the client's 15s call timeout, so the client hears a refusal rather than losing the reply.
 const TERMINAL_PANE_MOVE_TIMEOUT_MS = 10_000
@@ -53,7 +59,7 @@ export function requestTerminalPaneMoveFromRenderer(
       }
     }
     let committed: Promise<unknown> | null = null
-    const relayed: RelayedPaneMove = {
+    const relayed: RelayedPaneMove<TerminalLeafMoveResult> = {
       sender: webContents,
       timedOut: false,
       claim: (commit) => {
@@ -121,33 +127,72 @@ export function requestTerminalTabIntoPaneFromRenderer(
   const requestId = randomUUID()
   return new Promise<TerminalTabIntoPaneHostResult>((resolve, reject) => {
     let settled = false
+    let released = false
     const releaseListeners: (() => void)[] = []
-    const finish = (error: Error | null, result?: TerminalTabIntoPaneHostResult): void => {
+    const settle = (error: Error | null, result?: TerminalTabIntoPaneHostResult): void => {
       if (settled) {
         return
       }
       settled = true
       clearTimeout(timeout)
-      for (const releaseListener of releaseListeners) {
-        releaseListener()
-      }
       if (error || !result) {
         reject(error ?? new Error('terminal_pane_move_failed'))
       } else {
         resolve(result)
       }
     }
-    const onRendererUnavailable = (): void => finish(new Error('renderer_unavailable'))
-    const timeout = setTimeout(
-      () => finish(new Error('terminal_pane_move_timeout')),
-      TERMINAL_PANE_MOVE_TIMEOUT_MS
-    )
+    const release = (): void => {
+      if (released) {
+        return
+      }
+      released = true
+      for (const releaseListener of releaseListeners) {
+        releaseListener()
+      }
+    }
+    let committed: Promise<TerminalLeafIntoTabResult> | null = null
+    const relayed: RelayedPaneMove<TerminalLeafIntoTabResult> = {
+      sender: webContents,
+      timedOut: false,
+      claim: (commit) => {
+        clearTimeout(timeout)
+        committed = commit
+      },
+      // Why: the window's reply answers, after it applied the join the client redraws from.
+      answer: () => {}
+    }
+    const unfence = holdRelayedPaneJoin(relayedPaneJoinKey(move), relayed)
+    if (!unfence) {
+      // Why: replacing a still-fenced join would let its late commit answer this one.
+      reject(new Error('terminal_pane_move_in_progress'))
+      return
+    }
+    releaseListeners.push(unfence)
+    const onRendererUnavailable = (): void => {
+      release()
+      const refuse = (): void => settle(new Error('renderer_unavailable'))
+      if (!committed) {
+        refuse()
+        return
+      }
+      // A claimed commit still lands in main, so a joined pane is answered by its commit.
+      void committed.then(
+        (result) => (result.status === 'moved' ? settle(null, { status: 'moved' }) : refuse()),
+        refuse
+      )
+    }
+    // The client hears a refusal now; the join stays fenced until the window answers or goes away.
+    const timeout = setTimeout(() => {
+      relayed.timedOut = true
+      settle(new Error('terminal_pane_move_timeout'))
+    }, TERMINAL_PANE_MOVE_TIMEOUT_MS)
     const onReply = (event: Electron.IpcMainEvent, reply: TerminalTabIntoPaneMoveReply): void => {
       // Visible request IDs confer no authority; only the targeted window can answer.
       if (event.sender !== webContents || reply?.requestId !== requestId) {
         return
       }
-      finish(null, reply.result)
+      settle(null, reply.result)
+      release()
     }
     const lifetime = abortWhenRendererGone(webContents)
     lifetime.signal.addEventListener('abort', onRendererUnavailable, { once: true })
@@ -161,7 +206,7 @@ export function requestTerminalTabIntoPaneFromRenderer(
     try {
       webContents.send('ui:terminalTabIntoPaneRequest', request)
     } catch {
-      finish(new Error('renderer_unavailable'))
+      onRendererUnavailable()
     }
   })
 }

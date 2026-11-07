@@ -133,6 +133,8 @@ export type TerminalLeafIntoTabRefusal =
   | 'pty_missing'
   | 'kill_list_contains_moved_pty'
   | 'workspace_frozen'
+  /** A paired client was told its join timed out, so the host window may not commit it late. */
+  | 'relay_timed_out'
   | 'layout_owner_build'
 
 export type TerminalLeafIntoTabResult =

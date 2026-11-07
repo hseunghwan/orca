@@ -2,7 +2,11 @@ import { getPtyIpc } from '../pty-host-bindings'
 import type { Store } from '../../../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../../../runtime/orca-runtime'
 import { rekeyMovedPaneOwners } from '../../../runtime/moved-pane-owner-rekey'
-import { commitRelayedPaneMove } from '../../../window/terminal-pane-move-commit-fence'
+import {
+  commitRelayedPaneJoin,
+  commitRelayedPaneMove,
+  relayedPaneJoinKey
+} from '../../../window/terminal-pane-move-commit-fence'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
 import {
   isTerminalLeafIntoTabRequest,
@@ -66,10 +70,12 @@ export function installPtyLeafMoveIpcHandler(deps: {
       commitLeafMoveAndRekey(deps, args)
     )
   })
-  getPtyIpc().handle('pty:moveLeafIntoTab', async (_event, args: unknown) => {
+  getPtyIpc().handle('pty:moveLeafIntoTab', async (event, args: unknown) => {
     if (!isTerminalLeafIntoTabRequest(args)) {
       return { status: 'refused', reason: 'invalid_request' } satisfies TerminalLeafIntoTabResult
     }
-    return commitLeafIntoTabAndRekey(deps, args)
+    return commitRelayedPaneJoin(event.sender, relayedPaneJoinKey(args), () =>
+      commitLeafIntoTabAndRekey(deps, args)
+    )
   })
 }
