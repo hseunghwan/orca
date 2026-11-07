@@ -146,7 +146,7 @@ export function resolveTerminalTabStripDropTarget(args: {
           id: groupId,
           groupId,
           insertionIndex: insertion.index,
-          overlayKind: 'insertion',
+          overlay: { kind: 'insertion' },
           rect: insertion.rect,
           worktreeId
         }

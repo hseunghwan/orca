@@ -16,6 +16,7 @@ import { isTerminalTabPresent } from '@/store/slices/terminal-tab-retirement'
 import { clearTerminalFontSizeOverride } from './terminal-font-size-overrides'
 import { e2eConfig } from '@/lib/e2e-config'
 import { useAppStore } from '@/store'
+import { layoutContainsLeafId } from '../../../../shared/workspace-layout/terminal-pane-tree'
 
 export function cleanupTerminalPaneMount(args: {
   manager: PaneManager
@@ -115,8 +116,16 @@ export function cleanupTerminalPaneMount(args: {
   if (!tabStillExists) {
     // Cleanup also covers transports removed by a racing close.
     discardDeferredSplitPaneHandoffsForTab(tabId)
+    const layouts = useAppStore.getState().terminalLayoutsByTabId
     for (const pane of manager.getPanes()) {
-      clearTerminalFontSizeOverride(pane.leafId)
+      // A leaf joined into another tab keeps its id there, and its zoom with it.
+      const joinedElsewhere = Object.entries(layouts).some(
+        ([otherTabId, layout]) =>
+          otherTabId !== tabId && layoutContainsLeafId(layout?.root ?? null, pane.leafId)
+      )
+      if (!joinedElsewhere) {
+        clearTerminalFontSizeOverride(pane.leafId)
+      }
     }
   }
   for (const binding of panePtyBindingsRef.current.values()) {

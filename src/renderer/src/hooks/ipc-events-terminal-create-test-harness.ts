@@ -192,7 +192,8 @@ export async function setupTerminalCreateSurfacing(
     focusTerminalTabSurface
   }))
   vi.doMock('@/runtime/mounted-terminal-tab-registry', () => ({
-    focusRuntimeTerminalSurface
+    focusRuntimeTerminalSurface,
+    subscribeMountedTerminalTabChanges: vi.fn(() => () => {})
   }))
   vi.doMock('@/lib/activate-tab-and-focus-pane', () => ({
     activateTabAndFocusPane: vi.fn()

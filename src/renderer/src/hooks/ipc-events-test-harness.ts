@@ -134,7 +134,8 @@ export async function loadIpcEventsHarness(
   }))
   vi.doMock('@/lib/focus-terminal-tab-surface', () => ({ focusTerminalTabSurface: vi.fn() }))
   vi.doMock('@/runtime/mounted-terminal-tab-registry', () => ({
-    focusRuntimeTerminalSurface: vi.fn(() => false)
+    focusRuntimeTerminalSurface: vi.fn(() => false),
+    subscribeMountedTerminalTabChanges: vi.fn(() => () => {})
   }))
   vi.doMock('@/lib/activate-tab-and-focus-pane', () => ({ activateTabAndFocusPane: vi.fn() }))
 

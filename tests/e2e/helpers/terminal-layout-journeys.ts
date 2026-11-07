@@ -11,6 +11,10 @@ import {
 } from './terminal'
 import { ensureTerminalVisible, waitForSessionReady } from './store'
 import { SORTABLE_TAB } from './terminal-tab-menu'
+import {
+  LEAF_JOIN_BAND_FRACTION,
+  PANE_COLUMN_BAND_FRACTION
+} from '../../../src/renderer/src/components/tab-group/tab-drop-zone'
 
 export type FolderWorkspaceSetup = {
   worktreeId: string
@@ -116,5 +120,137 @@ export async function dragPaneOutToTabStrip(
     stripBox.y + stripBox.height / 2,
     { steps: 20 }
   )
+  await page.mouse.up()
+}
+
+export type TabDropSide = 'left' | 'right' | 'top' | 'bottom'
+
+/** The middle of a pane's join band on `side`, inside the group's interior (the panel minus its new-split band). */
+async function readPaneEdgeDropPoint(
+  page: Page,
+  args: { tabId: string; leafId: string; side: TabDropSide }
+): Promise<{ x: number; y: number }> {
+  const point = await page.evaluate(
+    ({ tabId, leafId, side, band, inset }) => {
+      const state = window.__store!.getState()
+      const worktreeId = state.activeWorktreeId!
+      const groupId = (state.unifiedTabsByWorktree[worktreeId] ?? []).find(
+        (tab) => tab.entityId === tabId
+      )?.groupId
+      const body = document.querySelector(
+        `[data-tab-group-body-id="${groupId}"][data-worktree-id="${worktreeId}"]`
+      )
+      const pane = document.querySelector(
+        `[data-terminal-tab-id="${tabId}"] .pane[data-leaf-id="${leafId}"]`
+      )
+      if (!body?.parentElement || !pane) {
+        return null
+      }
+      const panel = body.parentElement.getBoundingClientRect()
+      const bodyRect = body.getBoundingClientRect()
+      const paneRect = pane.getBoundingClientRect()
+      const left = Math.max(paneRect.left, panel.left + panel.width * band)
+      const right = Math.min(paneRect.right, panel.right - panel.width * band)
+      const top = Math.max(paneRect.top, bodyRect.top + bodyRect.height * band)
+      const bottom = Math.min(paneRect.bottom, bodyRect.bottom - bodyRect.height * band)
+      return {
+        x:
+          side === 'left'
+            ? left + (right - left) * inset
+            : side === 'right'
+              ? right - (right - left) * inset
+              : (left + right) / 2,
+        y:
+          side === 'top'
+            ? top + (bottom - top) * inset
+            : side === 'bottom'
+              ? bottom - (bottom - top) * inset
+              : (top + bottom) / 2
+      }
+    },
+    { ...args, band: PANE_COLUMN_BAND_FRACTION, inset: LEAF_JOIN_BAND_FRACTION / 2 }
+  )
+  if (!point) {
+    throw new Error(`Pane ${args.leafId} of tab ${args.tabId} is not laid out`)
+  }
+  return point
+}
+
+/**
+ * A real pointer drag of a tab onto the edge of a pane inside another tab: over that tab's strip
+ * entry first (which shows it), then to the edge. Waits for the "Join as split" overlay before the drop.
+ */
+export async function dragTabIntoPane(
+  page: Page,
+  args: { sourceTabId: string; targetTabId: string; leafId: string; side: TabDropSide }
+): Promise<void> {
+  const source = await page
+    .locator(`${SORTABLE_TAB}[data-tab-id="${args.sourceTabId}"]`)
+    .boundingBox()
+  const target = await page
+    .locator(`${SORTABLE_TAB}[data-tab-id="${args.targetTabId}"]`)
+    .boundingBox()
+  if (!source || !target) {
+    throw new Error('Source or target tab is not laid out')
+  }
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 12 })
+  const point = await readPaneEdgeDropPoint(page, {
+    tabId: args.targetTabId,
+    leafId: args.leafId,
+    side: args.side
+  })
+  await page.mouse.move(point.x, point.y, { steps: 20 })
+  const overlay = page.locator('[data-leaf-drop-overlay]')
+  await expect(overlay).toContainText('Join as split')
+  // Unlike the new-split band, the join overlay stays off the tab strip.
+  expect((await overlay.boundingBox())!.y).toBeGreaterThanOrEqual(target.y + target.height)
+  await page.mouse.up()
+}
+
+export const PANE_JOIN_OVERLAY = '.pane-drop-overlay[data-pane-drop-overlay-kind="join"]'
+
+/**
+ * A real pointer drag of a split pane by its title onto another shown tab's pane edge. `onTheWay`
+ * runs over the pane's own tab first; the drop waits for the pane drag's "Join as split" overlay.
+ */
+export async function dragPaneIntoPane(
+  page: Page,
+  args: {
+    sourceLeafId: string
+    targetTabId: string
+    targetLeafId: string
+    side: TabDropSide
+    onTheWay?: () => Promise<void>
+  }
+): Promise<void> {
+  const handle = await page
+    .locator(`.pane[data-leaf-id="${args.sourceLeafId}"] .pane-drag-handle`)
+    .boundingBox()
+  const source = await page.locator(`.pane[data-leaf-id="${args.sourceLeafId}"]`).boundingBox()
+  const strip = await page
+    .locator(`${SORTABLE_TAB}[data-tab-id="${args.targetTabId}"]`)
+    .boundingBox()
+  if (!handle || !source || !strip) {
+    throw new Error('Pane drag handle, its pane or the target tab is not laid out')
+  }
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + 4)
+  await page.mouse.down()
+  await page.mouse.move(source.x + source.width * 0.7, source.y + source.height / 2, {
+    steps: 12
+  })
+  await args.onTheWay?.()
+  const point = await readPaneEdgeDropPoint(page, {
+    tabId: args.targetTabId,
+    leafId: args.targetLeafId,
+    side: args.side
+  })
+  await page.mouse.move(point.x, point.y, { steps: 20 })
+  const overlay = page.locator(PANE_JOIN_OVERLAY)
+  await expect(overlay).toContainText('Join as split')
+  await expect(overlay).not.toHaveAttribute('data-disabled')
+  // The join overlay covers half the pane, never the tab strip above it.
+  expect((await overlay.boundingBox())!.y).toBeGreaterThanOrEqual(strip.y + strip.height)
   await page.mouse.up()
 }

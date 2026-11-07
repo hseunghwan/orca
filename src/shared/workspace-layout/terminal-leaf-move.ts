@@ -1,4 +1,5 @@
 import { makePaneKey, type PaneKey } from './stable-pane-id'
+import type { PaneSide } from './terminal-pane-tree'
 
 /** Detach one pane into a new tab; the leaf id and its terminal move with it. */
 export type TerminalLeafMoveRequest = {
@@ -48,6 +49,27 @@ export type TerminalPaneMoveToNewTabRequest = {
 
 export type TerminalPaneMoveToNewTabReply = { requestId: string; result: TerminalLeafMoveResult }
 
+/** Main asks its window to join a client's tab or pane into another tab's pane, in the host's tab ids. */
+export type TerminalTabIntoPaneMoveRequest = {
+  requestId: string
+  worktreeId: string
+  sourceTabId: string
+  /** The pane to move, whose tab may keep others; without it the source tab's only pane joins. */
+  sourceLeafId?: string
+  targetTabId: string
+  /** Without it the window joins beside the target's active pane. */
+  targetLeafId?: string
+  side: PaneSide
+}
+
+/** A host's answer to a client's join; `unknown` when its window may have committed without finishing. */
+export type TerminalTabIntoPaneHostResult = { status: 'moved' | 'refused' | 'unknown' | 'not_held' }
+
+export type TerminalTabIntoPaneMoveReply = {
+  requestId: string
+  result: TerminalTabIntoPaneHostResult
+}
+
 export function terminalLeafMovePaneKeys(request: TerminalLeafMoveRequest): {
   from: PaneKey
   to: PaneKey
@@ -79,6 +101,67 @@ export function isTerminalLeafMoveRequest(value: unknown): value is TerminalLeaf
   try {
     makePaneKey(candidate.sourceTabId, candidate.leafId)
     makePaneKey(candidate.targetTabId, candidate.leafId)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const PANE_SIDES: readonly PaneSide[] = ['left', 'right', 'top', 'bottom']
+
+/**
+ * Move a leaf into an existing tab as a split beside `targetLeafId`. The source tab closes when the
+ * leaf was its only one; `keepsSourcePane` asks main to refuse rather than close it.
+ */
+export type TerminalLeafIntoTabRequest = TerminalLeafMoveRequest & {
+  targetLeafId: string
+  placement: { kind: 'beside'; side: PaneSide }
+}
+
+export type TerminalLeafIntoTabRefusal =
+  | 'invalid_request'
+  | 'unsupported'
+  | 'last_pane'
+  | 'source_is_chat'
+  | 'source_launch_pending'
+  | 'target_tab_missing'
+  | 'target_leaf_missing'
+  | 'target_is_chat'
+  | 'partition_mismatch'
+  | 'leaf_in_other_tab'
+  | 'pty_mismatch'
+  | 'pty_missing'
+  | 'kill_list_contains_moved_pty'
+  | 'workspace_frozen'
+  /** A paired client was told its join timed out, so the host window may not commit it late. */
+  | 'relay_timed_out'
+  | 'layout_owner_build'
+
+export type TerminalLeafIntoTabResult =
+  /** Main grafted the leaf into the target, and closed the source tab if it emptied, in one durable write. */
+  | { status: 'moved'; ptyId: string; sourceTabClosed: boolean }
+  /** Main's session never held the leaf; the renderer must not apply the move alone. */
+  | { status: 'not_held' }
+  | { status: 'refused'; reason: TerminalLeafIntoTabRefusal }
+
+export function isTerminalLeafIntoTabRequest(value: unknown): value is TerminalLeafIntoTabRequest {
+  if (!isTerminalLeafMoveRequest(value)) {
+    return false
+  }
+  const candidate: Record<string, unknown> = { ...value }
+  const { targetLeafId, placement } = candidate
+  if (typeof targetLeafId !== 'string' || targetLeafId === candidate.leafId) {
+    return false
+  }
+  if (!placement || typeof placement !== 'object') {
+    return false
+  }
+  const { kind, side }: Record<string, unknown> = { ...placement }
+  if (kind !== 'beside' || !PANE_SIDES.some((known) => known === side)) {
+    return false
+  }
+  try {
+    makePaneKey(String(candidate.targetTabId), targetLeafId)
     return true
   } catch {
     return false

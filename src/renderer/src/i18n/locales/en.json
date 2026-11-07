@@ -4466,6 +4466,9 @@
           "TabGroupDropOverlay": {
             "paneColumnLabel": "New split"
           },
+          "TabLeafDropOverlay": {
+            "joinLabel": "Join as split"
+          },
           "useTabGroupCreationCommands": {
             "duplicateBrowserTabFailed": "The paired runtime could not duplicate the managed browser tab."
           }
@@ -22090,7 +22093,20 @@
       "runs": "Runs"
     },
     "paneMove": {
-      "failed": "Couldn't move the pane to a new tab."
+      "failed": "Couldn't move the pane to a new tab.",
+      "intoTabFailed": "Couldn't move the pane into that tab.",
+      "reason": {
+        "sourceNotSinglePane": "Tab has several panes",
+        "chat": "Chat view",
+        "noTerminal": "No running terminal",
+        "starting": "Still starting",
+        "sleeping": "Pane is asleep",
+        "exiting": "Pane is exiting",
+        "unverified": "Host not confirmed",
+        "remote": "Remote host tab",
+        "busy": "Another move is running",
+        "unavailable": "Unavailable"
+      }
     },
     "claudeOldTerminalBanner": {
       "title": "This terminal was opened before Orca's Claude account update, so claude here uses System default's login.",

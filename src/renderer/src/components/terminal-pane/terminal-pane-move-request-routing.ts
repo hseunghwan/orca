@@ -3,6 +3,11 @@ import type { TerminalLeafMoveResult } from '../../../../shared/workspace-layout
 import { requestBackgroundTerminalWorktreeMount } from '../terminal/background-terminal-worktree-mount'
 import { BACKGROUND_WORKTREE_MEASURE_WINDOW_MS } from '../terminal/background-terminal-worktree-visibility'
 import { holdTerminalPaneMount } from './terminal-pane-split-request-routing'
+import { moveTerminalTabIntoPaneInApp } from './terminal-tab-into-pane-deps'
+import type {
+  TerminalTabIntoPaneArgs,
+  TerminalTabIntoPaneOutcome
+} from './terminal-tab-into-pane-types'
 
 /** A pane another client moved to a new tab, under the tab id that client drew. */
 export type TerminalPaneMoveToNewTabTarget = {
@@ -109,4 +114,24 @@ export async function moveTerminalPaneToNewTabForClient(
     releaseMount()
   }
   return { status: 'refused', reason: 'pane_unavailable' }
+}
+
+/**
+ * Joins one pane of this window's tab into another tab's pane for a client. Only a mounted pane can
+ * let go of its PTY without killing it, so the source tab is mounted first; one that never mounts
+ * is refused.
+ */
+export async function moveTerminalPaneIntoTabForClient(
+  args: TerminalTabIntoPaneArgs & { worktreeId: string }
+): Promise<TerminalTabIntoPaneOutcome> {
+  const { worktreeId, ...join } = args
+  const sourceTabId = join.source.tabId
+  // Held for the whole join: parking the source mid-join would drop the pane it lets go of.
+  const releaseMount = holdTerminalPaneMount(sourceTabId, worktreeId)
+  try {
+    const mounted = await mountedHandler(worktreeId, sourceTabId)
+    return mounted ? await moveTerminalTabIntoPaneInApp(join) : 'refused'
+  } finally {
+    releaseMount()
+  }
 }

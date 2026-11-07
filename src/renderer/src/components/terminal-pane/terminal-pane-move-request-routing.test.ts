@@ -4,7 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
 import type { PtyConnectionDeps } from './pty-connection-types'
 import { installTerminalPaneMountEvents } from './terminal-pane-mount-events'
-import { moveTerminalPaneToNewTabForClient } from './terminal-pane-move-request-routing'
+import {
+  moveTerminalPaneIntoTabForClient,
+  moveTerminalPaneToNewTabForClient
+} from './terminal-pane-move-request-routing'
 import {
   _resetTerminalPaneSplitRequestRoutingForTests,
   hasTerminalPaneSplitMountLease
@@ -31,6 +34,9 @@ const requestBackgroundTerminalWorktreeMount = vi.hoisted(() => vi.fn())
 vi.mock('../terminal/background-terminal-worktree-mount', () => ({
   requestBackgroundTerminalWorktreeMount
 }))
+
+const moveTerminalTabIntoPaneInApp = vi.hoisted(() => vi.fn(() => Promise.resolve('moved')))
+vi.mock('./terminal-tab-into-pane-deps', () => ({ moveTerminalTabIntoPaneInApp }))
 
 const MOVED_LEAF = '22222222-2222-4222-8222-222222222222'
 
@@ -140,5 +146,50 @@ describe('a pane move a client asked this window for', () => {
 
     await expect(answer).resolves.toEqual({ status: 'refused', reason: 'pane_unavailable' })
     expect(hasTerminalPaneSplitMountLease('tab-1', 'wt-1')).toBe(false)
+  })
+})
+
+describe("a client's pane joining another tab in this window", () => {
+  const join = {
+    worktreeId: 'wt-1',
+    source: { kind: 'pane', tabId: 'tab-1', leafId: MOVED_LEAF },
+    targetTabId: 'tab-2',
+    side: 'right'
+  } as const
+  let unmount: (() => void) | null = null
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => {
+    unmount?.()
+    unmount = null
+    _resetTerminalPaneSplitRequestRoutingForTests()
+    requestBackgroundTerminalWorktreeMount.mockReset()
+    moveTerminalTabIntoPaneInApp.mockClear()
+    vi.useRealTimers()
+  })
+
+  it('mounts a parked source tab, then joins its pane, keeping it mounted until the join settles', async () => {
+    const answer = moveTerminalPaneIntoTabForClient(join)
+    expect(requestBackgroundTerminalWorktreeMount).toHaveBeenCalledWith({
+      worktreeId: 'wt-1',
+      tabIds: ['tab-1']
+    })
+    expect(hasTerminalPaneSplitMountLease('tab-1', 'wt-1')).toBe(true)
+    unmount = mountTab(vi.fn())
+
+    await expect(answer).resolves.toBe('moved')
+    expect(moveTerminalTabIntoPaneInApp).toHaveBeenCalledWith({
+      source: join.source,
+      targetTabId: 'tab-2',
+      side: 'right'
+    })
+    expect(hasTerminalPaneSplitMountLease('tab-1', 'wt-1')).toBe(false)
+  })
+
+  it('refuses when the source tab never mounts, since no pane here can let go of the PTY', async () => {
+    const answer = moveTerminalPaneIntoTabForClient(join)
+    await vi.runAllTimersAsync()
+
+    await expect(answer).resolves.toBe('refused')
+    expect(moveTerminalTabIntoPaneInApp).not.toHaveBeenCalled()
   })
 })

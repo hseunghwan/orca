@@ -20,7 +20,11 @@ import {
 } from '@/components/tab-group/tab-group-layout-owner-commands'
 import { resolveBrowserSessionTabTarget } from './browser-session-tab-target'
 import { resolveWindowTabIdForHostTab } from './host-session-tab-target'
-import { moveTerminalPaneToNewTabForClient } from '@/components/terminal-pane/terminal-pane-move-request-routing'
+import {
+  moveTerminalPaneIntoTabForClient,
+  moveTerminalPaneToNewTabForClient
+} from '@/components/terminal-pane/terminal-pane-move-request-routing'
+import { moveTerminalTabIntoPaneInApp } from '@/components/terminal-pane/terminal-tab-into-pane-deps'
 
 export function registerSessionTabIpcBridge(unsubs: (() => void)[]): void {
   unsubs.push(
@@ -147,7 +151,7 @@ export function registerSessionTabIpcBridge(unsubs: (() => void)[]): void {
   registerTerminalPaneMoveRequests(unsubs)
 }
 
-/** Moves a client's pane in this window, which owns the layout, and answers main with the result. */
+/** Moves a client's pane or joins its tab in this window, which owns the layout, and answers main. */
 function registerTerminalPaneMoveRequests(unsubs: (() => void)[]): void {
   const { onTerminalPaneMoveToNewTabRequest, replyTerminalPaneMoveToNewTab } = window.api.ui
   // Why: during an in-place renderer reload an older preload can linger; keep this listener additive at that seam.
@@ -161,6 +165,28 @@ function registerTerminalPaneMoveRequests(unsubs: (() => void)[]): void {
         sourceTabId: resolveWindowTabIdForHostTab(move.worktreeId, move.sourceTabId)
       }).then((result) => replyTerminalPaneMoveToNewTab({ requestId, result }))
     })
+  )
+  const { onTerminalTabIntoPaneRequest, replyTerminalTabIntoPane } = window.api.ui
+  if (!onTerminalTabIntoPaneRequest || !replyTerminalTabIntoPane) {
+    return
+  }
+  unsubs.push(
+    onTerminalTabIntoPaneRequest(
+      ({ requestId, worktreeId, sourceTabId, sourceLeafId, targetTabId, ...join }) => {
+        const tabId = resolveWindowTabIdForHostTab(worktreeId, sourceTabId)
+        const args = { ...join, targetTabId: resolveWindowTabIdForHostTab(worktreeId, targetTabId) }
+        const moved = sourceLeafId
+          ? moveTerminalPaneIntoTabForClient({
+              ...args,
+              worktreeId,
+              source: { kind: 'pane', tabId, leafId: sourceLeafId }
+            })
+          : moveTerminalTabIntoPaneInApp({ ...args, source: { kind: 'tab', tabId } })
+        void moved
+          .catch(() => 'unknown' as const)
+          .then((status) => replyTerminalTabIntoPane({ requestId, result: { status } }))
+      }
+    )
   )
 }
 

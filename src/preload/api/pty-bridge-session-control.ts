@@ -11,6 +11,8 @@ import type { ProjectExecutionRuntimeResolution } from '../../shared/project-exe
 import type { StartupCommandDelivery } from '../../shared/agent-launch/startup/codex-startup-delivery'
 import type { TerminalInputKind } from '../../shared/terminal/input/terminal-input-kind'
 import type {
+  TerminalLeafIntoTabRequest,
+  TerminalLeafIntoTabResult,
   TerminalLeafMoveRequest,
   TerminalLeafMoveResult
 } from '../../shared/workspace-layout/terminal-leaf-move'
@@ -194,6 +196,8 @@ export const ptySessionControlApi = {
   hasPty: (id: string): Promise<boolean | null> => ipcRenderer.invoke('pty:hasPty', { id }),
   moveLeafToNewTab: (request: TerminalLeafMoveRequest): Promise<TerminalLeafMoveResult> =>
     ipcRenderer.invoke('pty:moveLeafToNewTab', request),
+  moveLeafIntoTab: (request: TerminalLeafIntoTabRequest): Promise<TerminalLeafIntoTabResult> =>
+    ipcRenderer.invoke('pty:moveLeafIntoTab', request),
   getMainBufferSnapshot: (
     id: string,
     opts?: { scrollbackRows?: number }

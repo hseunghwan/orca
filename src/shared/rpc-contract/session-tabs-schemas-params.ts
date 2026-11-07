@@ -134,6 +134,15 @@ export const MovePaneToNewTab = WorktreeTabSelector.extend({
   targetGroupId: z.string().min(1).max(512).optional(),
   index: z.number().int().min(0).optional()
 })
+export const MoveTabIntoPane = WorktreeTabSelector.extend({
+  sourceTabId: MovePaneId,
+  // The pane to move; without it the source tab's only pane joins.
+  sourceLeafId: MovePaneId.optional(),
+  targetTabId: MovePaneId,
+  // Without it the host joins beside the target's active pane.
+  targetLeafId: MovePaneId.optional(),
+  side: z.enum(['left', 'right', 'top', 'bottom'])
+})
 export const SetTabProps = WorktreeTabSelector.extend({
   tabId: z
     .unknown()

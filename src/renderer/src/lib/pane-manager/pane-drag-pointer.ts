@@ -1,4 +1,9 @@
-import type { DropZone, ManagedPaneInternal, PaneExternalDropTarget } from './pane-manager-types'
+import type {
+  DropZone,
+  ManagedPaneInternal,
+  PaneExternalDropOverlay,
+  PaneExternalDropTarget
+} from './pane-manager-types'
 import type { DragReorderCallbacks, DragReorderState } from './pane-drag-reorder'
 import {
   handlePaneDrop,
@@ -238,9 +243,31 @@ function resolveDropZone(clientX: number, clientY: number, rect: DOMRect): DropZ
   return (Object.entries(distances).sort((a, b) => a[1] - b[1])[0]?.[0] ?? 'right') as DropZone
 }
 
-function positionDropOverlay(overlay: HTMLElement, rect: DOMRect, zone: DropZone): void {
+// The join look is the tab drag's join overlay, shared through its CSS classes.
+function styleDropOverlay(overlay: HTMLElement, style: PaneExternalDropOverlay): void {
+  const wasJoin = overlay.dataset.paneDropOverlayKind === 'join'
   overlay.style.display = ''
-  overlay.dataset.paneDropOverlayKind = 'area'
+  overlay.dataset.paneDropOverlayKind = style.kind
+  if (style.kind === 'join') {
+    overlay.classList.add('tab-join-overlay')
+    if (style.refused) {
+      overlay.dataset.disabled = ''
+    } else {
+      delete overlay.dataset.disabled
+    }
+    const label = document.createElement('span')
+    label.className = 'tab-join-overlay__label'
+    label.textContent = style.label
+    overlay.replaceChildren(label)
+  } else if (wasJoin) {
+    overlay.classList.remove('tab-join-overlay')
+    delete overlay.dataset.disabled
+    overlay.replaceChildren()
+  }
+}
+
+function positionDropOverlay(overlay: HTMLElement, rect: DOMRect, zone: DropZone): void {
+  styleDropOverlay(overlay, { kind: 'area' })
   const scrollX = window.scrollX
   const scrollY = window.scrollY
   const halfWidth = rect.width / 2
@@ -254,8 +281,7 @@ function positionDropOverlay(overlay: HTMLElement, rect: DOMRect, zone: DropZone
 
 function positionExternalDropOverlay(overlay: HTMLElement, target: PaneExternalDropTarget): void {
   const rect = target.rect
-  overlay.style.display = ''
-  overlay.dataset.paneDropOverlayKind = target.overlayKind ?? 'area'
+  styleDropOverlay(overlay, target.overlay ?? { kind: 'area' })
   overlay.style.left = `${rect.left + window.scrollX}px`
   overlay.style.top = `${rect.top + window.scrollY}px`
   overlay.style.width = `${rect.width}px`
