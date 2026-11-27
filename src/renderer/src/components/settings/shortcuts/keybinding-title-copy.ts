@@ -113,6 +113,10 @@ const STATIC_TITLE_COPY = {
   'editor.toggleChangesView': () =>
     translate('keybindings.title.editorToggleChangesView', 'Toggle changes view'),
   'editor.copyContext': () => translate('keybindings.title.258e7f75ec', 'Copy context'),
+  'editor.navigateBack': () =>
+    translate('keybindings.title.editorNavigateBack', 'Go Back in Editor'),
+  'editor.navigateForward': () =>
+    translate('keybindings.title.editorNavigateForward', 'Go Forward in Editor'),
   'editor.previousChange': () => translate('keybindings.title.324e886c0f', 'Go to previous change'),
   'editor.nextChange': () => translate('keybindings.title.7055c70bdb', 'Go to next change'),
   'editor.addReviewNote': () => translate('keybindings.title.9cb1023d40', 'Add review note'),
@@ -125,7 +129,10 @@ const STATIC_TITLE_COPY = {
   'fileExplorer.copyRelativePath': () =>
     translate('keybindings.title.fileExplorerCopyRelativePath', 'Copy relative file path'),
   'fileExplorer.delete': () => translate('keybindings.title.fileExplorerDelete', 'Delete file'),
+  'fileExplorer.toggleDotfiles': () =>
+    translate('keybindings.title.fileExplorerToggleDotfiles', 'Toggle dotfiles'),
   'settings.search': () => translate('keybindings.title.3acf4e9eb1', 'Search settings'),
+  'page.search': () => translate('keybindings.title.pageSearch', 'Search this page'),
   'terminal.copySelection': () =>
     translate('keybindings.title.terminalCopySelection', 'Copy terminal selection'),
   'terminal.selectAll': () =>
